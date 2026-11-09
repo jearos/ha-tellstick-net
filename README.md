@@ -1,0 +1,282 @@
+# TellStick Net (local) for Home Assistant
+
+Use a **Telldus TellStick Net** from Home Assistant **over your LAN** - no
+Telldus Live account, no MQTT bridge.
+
+Firmware 17, the last stable TellStick Net firmware, has an undocumented local
+UDP interface. This integration talks to it directly, so Home Assistant never
+goes through Telldus Live.
+
+> Not affiliated with or endorsed by Telldus Technologies. "TellStick" is a
+> trademark of its owner and is used here only to say which device this works
+> with.
+
+## Features
+
+- **Discovery**: finds TellStick Nets on the LAN, and picks them up
+  automatically via DHCP.
+- **Sensors**: 433 MHz temperature/humidity sensors are created automatically
+  the first time they're heard. Push-based, no polling.
+- **Keeps history across battery changes**: many cheap sensors pick a new
+  random ID when the battery is changed. *Replace sensor* moves the new ID onto
+  the old sensor, keeping its entities, name, area and history.
+- **Switches**: Nexa / Proove / Arctech *self-learning* on/off receivers, either
+  paired with a new code or copied from an existing remote by pressing one of
+  its buttons.
+- **Remote events**: every decoded remote/wall-switch press fires a
+  `tellstick_local_command` event for automations.
+- **Follows the device** if it gets a new IP address (DHCP discovery, plus
+  rediscovery by MAC while it's offline).
+- **Firmware check**: a repair issue if the device runs firmware without the
+  local interface.
+
+### Tested with
+
+| | |
+|---|---|
+| Device | TellStick Net, stock firmware 17 |
+| Sensors | Oregon Scientific temperature/humidity |
+| Switches | Nexa self-learning receivers and remotes |
+| Home Assistant | 2026.10 |
+
+Decoders for Fine Offset, Mandolyn and other sensors are included but
+untested. Reports (working or not) are welcome as GitHub issues.
+
+## Requirements
+
+- Home Assistant 2025.2 or newer.
+- A TellStick Net with **firmware 17**; see [Firmware](#firmware). Stock
+  firmware works, no reflashing needed.
+- Home Assistant and the TellStick Net on the **same network segment**:
+  - Discovery uses UDP broadcast, which doesn't cross VLANs or routers. Across
+    VLANs, add the device by IP address.
+  - The device sends its events to Home Assistant over UDP. Home Assistant OS
+    and Supervised are fine; in Docker, run the container with host
+    networking (`network_mode: host`).
+  - Firewalls must allow UDP 30303 and 42314 to the device and its replies
+    back.
+
+The TellStick ZNet Lite has an official local API and isn't supported here.
+
+## Installation
+
+### HACS (custom repository)
+
+1. HACS → ⋮ → *Custom repositories* → add
+   `https://github.com/jearos/ha-tellstick-net`, category *Integration*.
+2. Install *TellStick Net (local)* and restart Home Assistant.
+
+### Manual
+
+Copy `custom_components/tellstick_local/` into your Home Assistant
+`config/custom_components/` folder and restart.
+
+## Setup
+
+*Settings → Devices & services → Add integration → TellStick Net (local)*.
+Pick the device from the list, or enter its IP address. A TellStick Net that
+gets an address via DHCP may also show up as *Discovered*.
+
+Sensors appear by themselves as they transmit. Give each sensor's device an
+area (*Settings → Devices*) to have it show up in the default dashboard.
+
+Then use **Configure** on the integration for:
+
+| Option | What it does |
+|---|---|
+| Add Nexa self-learning switch | Creates a switch with a new random code. Save, put the receiver in learn mode (often: just plug it in) and turn the switch on in Home Assistant to pair. |
+| Add switch by pressing a remote | Listens for 60 seconds; press an on/off button on a Nexa/Proove self-learning remote or wall switch. A switch with that button's code is created, so receivers that already obey the button obey Home Assistant too, without pairing. |
+| Remove switches | Removes switches. |
+| Replace sensor | After a battery change: pick the old sensor and the new one. The old one keeps its history and follows the new ID; the duplicate is removed. |
+| Settings | Whether newly heard sensors are enabled automatically. Turn off if you pick up your neighbours' sensors. |
+
+Switch state is assumed (433 MHz is one-way). It also follows presses of the
+same code over the air: for a switch copied from a remote, pressing that
+remote updates Home Assistant. A switch paired with its own new code doesn't
+see the remote's presses, because the remote sends a different code.
+
+Unwanted sensors can be deleted from their device page. If they keep
+transmitting they come back (disabled, if *Settings* says so).
+
+## Automations on remote presses
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: tellstick_local_command
+    event_data:
+      house: 53103098
+      unit: 1
+      method: turnon
+```
+
+Event data: `mac`, `protocol`, `model`, `house`, `unit`, `group`, `method`
+(and `code` for some protocols). To find a remote's `house` and `unit`, listen
+for `tellstick_local_command` under *Developer tools → Events* and press the
+button.
+
+## Firmware
+
+**Firmware 17 is required.** The local interface first appeared in firmware
+17, the last stable release. If the device reports an older version, Home
+Assistant shows a repair issue.
+
+| Firmware | Local interface |
+|---|---|
+| 2, 3, 4 | no |
+| beta 12, beta 16 | no |
+| **17** | **yes** (tested) |
+| beta 18 (never released as stable) | yes (untested) |
+
+The version a device runs is shown on its device page in Home Assistant.
+
+### Updating the firmware
+
+Only needed if your device runs firmware older than 17. The integration
+doesn't update firmware itself (yet) and doesn't ship Telldus' firmware.
+Updating is done from a computer over **TFTP**, following
+[Telldus' own guide](https://developer.telldus.com/wiki/Firmware_linux). The
+TellStick Net has a TFTP bootloader: the running firmware restarts into it
+when a TFTP upload arrives, so you don't need to unplug anything.
+
+> If an update is interrupted the device can be recovered (see below), but
+> don't pull the power while uploading.
+
+1. **Find the device's IP address**: the integration's device page in Home
+   Assistant, or your router's list of connected devices. The computer must be
+   on the same subnet (the device ignores restart requests from other
+   subnets).
+2. **Download the firmware**: `tellstick_net_fw17.hex` from the top level of
+   Telldus' firmware folder, linked from their guide
+   (`http://download.telldus.com/TellStick/Software/firmware/`). The `old/`
+   and `beta/` subfolders hold older versions and unreleased betas; don't use
+   those.
+3. **Upload it with TFTP.**
+
+   *Linux / macOS* - `tftp` is included on macOS; on Linux install e.g.
+   `tftp-hpa`. In a terminal, in the folder with the file:
+
+   ```
+   tftp <device-ip>
+   tftp> rexmt 1
+   tftp> timeout 60
+   tftp> put tellstick_net_fw17.hex
+   tftp> quit
+   ```
+
+   `rexmt 1` / `timeout 60` make the client retry every second for up to a
+   minute: the first packets only make the device restart into its
+   bootloader, which then accepts the upload. Wait until `put` reports that
+   the transfer is complete.
+
+   *Windows* - turn on *TFTP Client* under *Turn Windows features on or off*,
+   or use Telldus' *TellStickNetFlasher* tool; see Telldus' guides linked from
+   the page above.
+4. **Check**: after a short while the device comes back, normally with the
+   same IP. Home Assistant shows the new version on the TellStick's device
+   page and the repair issue disappears.
+
+### If the update fails (recovery mode)
+
+If an upload is interrupted, the device stays in its bootloader: the green
+LED on the network connector **blinks in groups of seven**, and it listens on
+the fixed address **`192.168.97.60`** for a new upload.
+
+1. Give your computer an address on that subnet, e.g. `192.168.97.10`,
+   netmask `255.255.255.0` (an extra address/alias on the wired interface,
+   connected to the same switch as the TellStick).
+2. Upload the firmware as above, to `192.168.97.60`.
+3. Remove the extra address again. The device returns to its normal address
+   from DHCP.
+
+Telldus' full guide:
+[How to restore a bricked TellStick Net](https://developer.telldus.com/wiki/How_to_restore_a_bricked_TellStick_Net)
+(with variants for Linux, macOS and Windows).
+
+## Security
+
+The TellStick Net's local interface has **no authentication**: anything on
+your LAN can send RF commands through it, register as its listener, change
+its IP settings or restart it, and its discovery reply includes the device's
+activation secret in plain text (this integration never stores or logs it).
+433 MHz itself is unencrypted and one-way. Keep the device on a trusted
+network/VLAN and don't use it to switch anything where an unexpected or
+missed command would be dangerous.
+
+## Limitations
+
+- Switches: only Arctech self-learning on/off for now (no dimmers, no
+  code-wheel/old Nexa, no other protocols).
+- Sensors: temperature and humidity only (no rain/wind yet).
+- The device supports one listener at a time. Running this next to another
+  local client (e.g. the tellsticknet MQTT bridge) makes them steal events
+  from each other.
+- No confirmation that a receiver actually switched (radio limitation).
+
+## Troubleshooting
+
+**The device isn't found during setup**
+- Check that Home Assistant and the TellStick Net are on the same network
+  segment (see [Requirements](#requirements)), then enter its IP address
+  manually.
+- The device needs firmware 17. If its network LED blinks in groups of seven,
+  it's in recovery mode; see
+  [If the update fails](#if-the-update-fails-recovery-mode).
+
+**The device is found, but no sensors appear**
+- Sensors appear only once they transmit, usually within a minute or two.
+- Check *Configure → Settings*: with automatic enabling off, new sensors are
+  added disabled.
+- Another program registered as the TellStick's listener (e.g. the
+  tellsticknet MQTT bridge, or a second Home Assistant) takes the events away.
+- In Docker without host networking, the device's events can't reach Home
+  Assistant.
+
+**A sensor shows up as a new device after a battery change**
+- Use *Configure → Replace sensor*; see [Setup](#setup).
+
+**A switch doesn't switch the receiver**
+- Pair it first (receiver in learn mode, then turn the switch on), or create
+  it with *Add switch by pressing a remote*.
+- Check the range: the TellStick Net transmits on 433 MHz from where it
+  stands.
+
+For debug logs, add to `configuration.yaml`:
+
+```yaml
+logger:
+  logs:
+    custom_components.tellstick_local: debug
+```
+
+## How it works
+
+```
+Home Assistant ──UDP 30303 "D"──────────▶ TellStick Net   discovery / liveness
+               ──UDP 42314 reglistener──▶                 "send RF events to me"
+               ◀─UDP RawData────────────                  every received RF packet
+               ──UDP 42314 send─────────▶                 transmit RF command
+```
+
+Packets use Telldus' LiveMessage encoding. The device forwards raw RF data;
+decoding happens in Home Assistant.
+
+## Development
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+The tests run without Home Assistant: `hub.py` and `known_sensors.py` have no
+Home Assistant imports and are tested against a fake device on localhost.
+
+## Credits
+
+The RF protocol decoders/encoders in `custom_components/tellstick_local/tellsticknet/`
+are vendored from [molobrakos/tellsticknet](https://github.com/molobrakos/tellsticknet)
+(MIT, see the `LICENSE` in that folder), which first documented local access
+to the TellStick Net.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
