@@ -1,5 +1,11 @@
 # TellStick Net (local) for Home Assistant
 
+[![Validate](https://github.com/jearos/ha-tellstick-net/actions/workflows/validate.yml/badge.svg)](https://github.com/jearos/ha-tellstick-net/actions/workflows/validate.yml)
+[![Release](https://img.shields.io/github/v/release/jearos/ha-tellstick-net)](https://github.com/jearos/ha-tellstick-net/releases)
+[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2025.2%2B-41BDF5?logo=home-assistant&logoColor=white)](https://www.home-assistant.io/)
+[![License: MIT](https://img.shields.io/github/license/jearos/ha-tellstick-net)](LICENSE)
+
 Use a **Telldus TellStick Net** from Home Assistant **over your LAN** - no
 Telldus Live account, no MQTT bridge.
 
