@@ -1,0 +1,85 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Choose TellStick Net",
+        "description": "These TellStick Net devices answered on the local network.",
+        "data": {
+          "host": "Device"
+        }
+      },
+      "manual": {
+        "title": "TellStick Net address",
+        "description": "No TellStick Net answered the broadcast. Enter its IP address.",
+        "data": {
+          "host": "IP address"
+        }
+      },
+      "confirm": {
+        "title": "TellStick Net found",
+        "description": "Set up the TellStick Net at {host} (MAC {mac}, firmware {firmware})?"
+      }
+    },
+    "error": {
+      "cannot_connect": "No TellStick Net answered at that address (UDP port 30303)."
+    },
+    "abort": {
+      "already_configured": "This TellStick Net is already set up.",
+      "not_tellstick_net": "This Telldus device isn't a TellStick Net (it didn't answer TellStick Net discovery)."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "TellStick Net",
+        "menu_options": {
+          "add_switch": "Add Nexa self-learning switch",
+          "remove_switch": "Remove switches",
+          "replace_sensor": "Replace sensor (new ID after battery change)",
+          "settings": "Settings"
+        }
+      },
+      "add_switch": {
+        "title": "Add Nexa self-learning switch",
+        "description": "To pair a new receiver: keep the random house code, save, put the receiver in learn mode and turn the new switch on. To control a receiver that already listens to a remote, enter that remote's house code and unit (press the remote and look for a tellstick_local_command event).",
+        "data": {
+          "name": "Name",
+          "house": "House code",
+          "unit": "Unit (1-16)"
+        }
+      },
+      "remove_switch": {
+        "title": "Remove switches",
+        "data": {
+          "switches": "Switches to remove"
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "data": {
+          "new_sensors_enabled": "Enable newly heard sensors automatically"
+        },
+        "data_description": {
+          "new_sensors_enabled": "433 MHz sensors from neighbours are picked up too. When off, new sensors are added disabled and you enable the ones you want."
+        }
+      },
+      "replace_sensor": {
+        "title": "Replace sensor",
+        "description": "Many 433 MHz sensors pick a new random ID after a battery change or reset, so they show up as a new sensor. Pick the old sensor and the new one: the old sensor's entities, name and history are kept and will follow the new ID, and the new duplicate is removed.",
+        "data": {
+          "old_sensor": "Old sensor (keep this one)",
+          "new_sensor": "New sensor (its new ID)"
+        },
+        "data_description": {
+          "old_sensor": "Sensors that have been silent longest are listed first.",
+          "new_sensor": "Most recently discovered sensors are listed first. Compare the readings to find the right one."
+        }
+      }
+    },
+    "error": {
+      "already_exists": "A switch with this house code and unit already exists.",
+      "same_sensor": "Pick two different sensors."
+    }
+  }
+}
