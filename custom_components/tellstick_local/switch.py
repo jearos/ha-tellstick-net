@@ -12,6 +12,7 @@ from typing import Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -36,16 +37,24 @@ async def async_setup_entry(
     configured = entry.options.get(CONF_SWITCHES, [])
     entities = [TellStickSwitch(entry, cfg) for cfg in configured]
 
-    # Drop registry entries for switches that were removed in the options flow
+    # Drop entities and devices of switches removed in the options flow
+    prefix = f"{mac}-arctech-selflearning-"
     wanted = {e.unique_id for e in entities}
     registry = er.async_get(hass)
     for reg_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
         if (
             reg_entry.domain == "switch"
-            and reg_entry.unique_id.startswith(f"{mac}-arctech-selflearning-")
+            and reg_entry.unique_id.startswith(prefix)
             and reg_entry.unique_id not in wanted
         ):
             registry.async_remove(reg_entry.entity_id)
+    devices = dr.async_get(hass)
+    for device in dr.async_entries_for_config_entry(devices, entry.entry_id):
+        if any(
+            domain == DOMAIN and ident.startswith(prefix) and ident not in wanted
+            for domain, ident in device.identifiers
+        ):
+            devices.async_remove_device(device.id)
 
     async_add_entities(entities)
 

@@ -15,7 +15,10 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 
 from .const import (
+    CONF_HOUSE,
     CONF_MAC,
+    CONF_SWITCHES,
+    CONF_UNIT,
     DOMAIN,
     EVENT_RF_COMMAND,
     FIRMWARE_UPDATE_URL,
@@ -233,14 +236,26 @@ def async_check_firmware(
 async def async_remove_config_entry_device(
     hass: HomeAssistant, entry: TellStickConfigEntry, device: dr.DeviceEntry
 ) -> bool:
-    """Allow deleting sensor devices (e.g. a neighbour's) from the UI.
+    """Allow deleting sensor and switch devices from the UI.
 
-    The sensor comes back if it is heard again; turn off "Enable newly heard
-    sensors" to have it come back disabled instead.
+    A deleted sensor comes back if it is heard again; turn off "Enable newly
+    heard sensors" to have it come back disabled instead. A deleted switch is
+    dropped from the options so it doesn't come back on reload.
     """
     mac = entry.data[CONF_MAC]
     if (DOMAIN, mac) in device.identifiers:
         return False  # the TellStick itself
+    switches = entry.options.get(CONF_SWITCHES, [])
+    kept = [
+        s
+        for s in switches
+        if (DOMAIN, f"{mac}-arctech-selflearning-{s[CONF_HOUSE]}-{s[CONF_UNIT]}")
+        not in device.identifiers
+    ]
+    if len(kept) != len(switches):
+        hass.config_entries.async_update_entry(
+            entry, options={**entry.options, CONF_SWITCHES: kept}
+        )
     data = entry.runtime_data
     for sensor in data.sensors:
         if sensor_device_identifier(mac, sensor.uid) in device.identifiers:
