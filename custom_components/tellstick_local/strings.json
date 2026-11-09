@@ -35,6 +35,7 @@
         "title": "TellStick Net",
         "menu_options": {
           "add_switch": "Add Nexa self-learning switch",
+          "learn_switch": "Add switch by pressing a remote",
           "remove_switch": "Remove switches",
           "replace_sensor": "Replace sensor (new ID after battery change)",
           "settings": "Settings"
@@ -75,11 +76,29 @@
           "old_sensor": "Sensors that have been silent longest are listed first.",
           "new_sensor": "Most recently discovered sensors are listed first. Compare the readings to find the right one."
         }
+      },
+      "learn_timeout": {
+        "title": "No remote heard",
+        "description": "No self-learning remote or wall switch (Nexa/Proove/Arctech) was heard. Make sure it's within range of the TellStick and press an on or off button (not 'all on/off').",
+        "menu_options": {
+          "learn_switch": "Try again",
+          "init": "Back"
+        }
+      },
+      "learn_confirm": {
+        "title": "Remote found",
+        "description": "Heard house code {house}, unit {unit}. The new switch sends exactly this code, so receivers that obey this button will also obey Home Assistant - no pairing needed. Pressing the button later also updates the switch's state in Home Assistant.",
+        "data": {
+          "name": "Name"
+        }
       }
     },
     "error": {
       "already_exists": "A switch with this house code and unit already exists.",
       "same_sensor": "Pick two different sensors."
+    },
+    "progress": {
+      "press_remote": "Press an on or off button on the remote or wall switch you want to copy. Listening for {seconds} seconds..."
     }
   },
   "issues": {

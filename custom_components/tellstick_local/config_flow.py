@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import random
 import time
 from typing import Any
@@ -19,6 +20,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from . import (
@@ -37,6 +39,7 @@ from .const import (
     DOMAIN,
     HOUSE_MAX,
     HOUSE_MIN,
+    SIGNAL_PACKET,
     UNIT_MAX,
     UNIT_MIN,
 )
@@ -44,6 +47,8 @@ from .hub import DiscoveredDevice, async_discover
 from .known_sensors import KnownSensor
 
 MANUAL = "manual"
+# How long "Add switch by pressing a remote" listens for a button press
+LEARN_TIMEOUT = 60
 OLD_SENSOR = "old_sensor"
 NEW_SENSOR = "new_sensor"
 
@@ -178,6 +183,10 @@ class TellStickConfigFlow(ConfigFlow, domain=DOMAIN):
 class TellStickOptionsFlow(OptionsFlow):
     """Manage switches and sensor settings."""
 
+    def __init__(self) -> None:
+        self._learn_task: asyncio.Task[dict[str, Any]] | None = None
+        self._learned: dict[str, Any] | None = None
+
     def _options(self) -> dict[str, Any]:
         return dict(self.config_entry.options)
 
@@ -214,6 +223,8 @@ class TellStickOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         menu = ["add_switch"]
+        if self.config_entry.state is ConfigEntryState.LOADED:
+            menu.append("learn_switch")
         if self._switches():
             menu.append("remove_switch")
         if len(self._known_sensors()) >= 2:
@@ -266,6 +277,85 @@ class TellStickOptionsFlow(OptionsFlow):
                     ),
                 }
             ),
+            errors=errors,
+        )
+
+    async def async_step_learn_switch(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Listen for a self-learning remote/wall switch and copy its code."""
+        if self._learn_task is None:
+            self._learn_task = self.hass.async_create_task(
+                self._async_wait_for_remote(), eager_start=False
+            )
+        if not self._learn_task.done():
+            return self.async_show_progress(
+                progress_action="press_remote",
+                progress_task=self._learn_task,
+                description_placeholders={"seconds": str(LEARN_TIMEOUT)},
+            )
+        task, self._learn_task = self._learn_task, None
+        try:
+            self._learned = task.result()
+        except TimeoutError:
+            return self.async_show_progress_done(next_step_id="learn_timeout")
+        return self.async_show_progress_done(next_step_id="learn_confirm")
+
+    async def _async_wait_for_remote(self) -> dict[str, Any]:
+        found: asyncio.Future[dict[str, Any]] = self.hass.loop.create_future()
+
+        @callback
+        def on_packet(packet: dict[str, Any]) -> None:
+            if (
+                not found.done()
+                and packet.get("class") == "command"
+                and packet.get("protocol") == "arctech"
+                and packet.get("model") == "selflearning"
+                and packet.get("group") != 1  # "all on/off" names no unit
+                and isinstance(packet.get("house"), int)
+                and isinstance(packet.get("unit"), int)
+            ):
+                found.set_result(packet)
+
+        unsub = async_dispatcher_connect(
+            self.hass,
+            SIGNAL_PACKET.format(entry_id=self.config_entry.entry_id),
+            on_packet,
+        )
+        try:
+            async with asyncio.timeout(LEARN_TIMEOUT):
+                return await found
+        finally:
+            unsub()
+
+    async def async_step_learn_timeout(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return self.async_show_menu(
+            step_id="learn_timeout", menu_options=["learn_switch", "init"]
+        )
+
+    async def async_step_learn_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        assert self._learned is not None
+        house, unit = self._learned["house"], self._learned["unit"]
+        switches = self._switches()
+        exists = any(s[CONF_HOUSE] == house and s[CONF_UNIT] == unit for s in switches)
+        errors: dict[str, str] = {"base": "already_exists"} if exists else {}
+        if user_input is not None and not exists:
+            switches.append(
+                {CONF_NAME: user_input[CONF_NAME].strip(), CONF_HOUSE: house, CONF_UNIT: unit}
+            )
+            return self.async_create_entry(
+                data={**self._options(), CONF_SWITCHES: switches}
+            )
+        return self.async_show_form(
+            step_id="learn_confirm",
+            data_schema=vol.Schema(
+                {vol.Required(CONF_NAME, default=f"Nexa {house} unit {unit}"): str}
+            ),
+            description_placeholders={"house": str(house), "unit": str(unit)},
             errors=errors,
         )
 
