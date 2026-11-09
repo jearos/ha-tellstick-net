@@ -10,6 +10,7 @@ from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 
@@ -17,6 +18,9 @@ from .const import (
     CONF_MAC,
     DOMAIN,
     EVENT_RF_COMMAND,
+    FIRMWARE_UPDATE_URL,
+    ISSUE_OLD_FIRMWARE,
+    LATEST_FIRMWARE,
     SIGNAL_AVAILABLE,
     SIGNAL_PACKET,
     STORAGE_KEY,
@@ -110,6 +114,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: TellStickConfigEntry) ->
         device = device_registry.async_get(hub_device.id)
         if device is not None and device.sw_version != firmware:
             device_registry.async_update_device(device.id, sw_version=firmware)
+        async_check_firmware(hass, entry, firmware)
 
     store: Store[dict[str, Any]] = Store(
         hass, STORAGE_VERSION, STORAGE_KEY.format(entry_id=entry.entry_id)
@@ -184,6 +189,45 @@ async def async_unload_entry(hass: HomeAssistant, entry: TellStickConfigEntry) -
     # still pending here would be lost (and with it any new sensor's uid).
     await entry.runtime_data.async_save()
     return unloaded
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: TellStickConfigEntry) -> None:
+    """Clean up when the integration entry is deleted."""
+    ir.async_delete_issue(hass, DOMAIN, ISSUE_OLD_FIRMWARE.format(entry_id=entry.entry_id))
+
+
+@callback
+def async_check_firmware(
+    hass: HomeAssistant, entry: ConfigEntry, firmware: str
+) -> None:
+    """Raise a repair issue for stock firmware without local access (< 17).
+
+    Non-numeric versions (e.g. the open-source firmware's "X") are left
+    alone: there is nothing newer to point those users to.
+    """
+    issue_id = ISSUE_OLD_FIRMWARE.format(entry_id=entry.entry_id)
+    try:
+        version = int(firmware)
+    except ValueError:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+        return
+    if version >= LATEST_FIRMWARE:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+        return
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        issue_id,
+        is_fixable=False,
+        severity=ir.IssueSeverity.ERROR,
+        learn_more_url=FIRMWARE_UPDATE_URL,
+        translation_key="old_firmware",
+        translation_placeholders={
+            "name": entry.title,
+            "firmware": firmware,
+            "latest": str(LATEST_FIRMWARE),
+        },
+    )
 
 
 async def async_remove_config_entry_device(

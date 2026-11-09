@@ -25,3 +25,10 @@ SIGNAL_AVAILABLE = f"{DOMAIN}_available_{{entry_id}}"
 STORAGE_VERSION = 1
 # {"sensors": [KnownSensor.to_dict(), ...]}, see known_sensors.py
 STORAGE_KEY = f"{DOMAIN}.sensors.{{entry_id}}"
+
+# Last stable TellStick Net firmware, and the first with the local interface
+# (reglistener/setip/saveip are absent from fw2-4 and betas 12/16). Older
+# versions get a repair issue.
+LATEST_FIRMWARE = 17
+FIRMWARE_UPDATE_URL = "https://developer.telldus.com/wiki/Firmware_linux"
+ISSUE_OLD_FIRMWARE = "old_firmware_{entry_id}"

@@ -81,5 +81,11 @@
       "already_exists": "A switch with this house code and unit already exists.",
       "same_sensor": "Pick two different sensors."
     }
+  },
+  "issues": {
+    "old_firmware": {
+      "title": "{name} needs firmware {latest}",
+      "description": "{name} reports firmware {firmware}. The local interface this integration uses was added in TellStick Net firmware {latest}; older versions don't have it, so sensors and switches won't work until the device is updated.\n\nTelldus' firmware is installed over TFTP: download `tellstick_net_fw{latest}.hex` from Telldus and follow their guide (Learn more), or see \"Updating the firmware\" in this integration's README. If an update is interrupted the device goes into recovery mode (LED blinks in groups of seven) and the upload can simply be repeated.\n\nThis notice disappears once the device reports firmware {latest} or newer."
+    }
   }
 }
