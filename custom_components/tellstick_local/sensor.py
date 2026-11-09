@@ -66,8 +66,17 @@ async def async_setup_entry(
     )
 
     def make(sensor: KnownSensor, quantity: str, enabled: bool) -> TellStickSensor:
+        key = (sensor.uid, quantity)
         entity = TellStickSensor(entry, sensor, DESCRIPTIONS[quantity], enabled)
-        entities[(sensor.uid, quantity)] = entity
+        entities[key] = entity
+
+        @callback
+        def forget() -> None:
+            # Deleted in the UI: forget it, so it is created anew when heard
+            if entities.get(key) is entity:
+                del entities[key]
+
+        entity.async_on_remove(forget)
         return entity
 
     restored = [
@@ -142,6 +151,7 @@ class TellStickSensor(TellStickEntity, RestoreSensor):
             "model": self._sensor.model,
             "sensor_id": self._sensor.sensor_id,
         }
+
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         if self._pending is not None:

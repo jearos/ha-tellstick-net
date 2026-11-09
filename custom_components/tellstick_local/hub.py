@@ -29,10 +29,12 @@ _LOGGER = logging.getLogger(__name__)
 DISCOVERY_PORT = 30303
 COMMAND_PORT = 42314
 
-# The firmware forgets its listener on reboot, so register again regularly.
-REGISTER_INTERVAL = 300.0
 # Discovery queries double as a liveness check.
 PING_INTERVAL = 30.0
+# The firmware forgets its listener on reboot. A reboot is over in ~12 s, far
+# too quick for the offline detection below to notice, so re-register with
+# every ping: one tiny packet bounds lost RF events to PING_INTERVAL.
+REGISTER_INTERVAL = PING_INTERVAL
 # Considered offline after this long without any reply or RF packet.
 OFFLINE_AFTER = 95.0
 # While offline, broadcast for our MAC this often in case DHCP moved it.
