@@ -106,6 +106,7 @@ class SelflearningEntity(TellStickEntity, RestoreEntity):
     def _handle_packet(self, packet: dict[str, Any]) -> None:
         if (
             packet.get("class") != "command"
+            or packet.get("repeat")  # same press again
             or packet.get("protocol") != "arctech"
             or packet.get("model") != "selflearning"
             or packet.get("house") != self._house

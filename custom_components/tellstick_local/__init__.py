@@ -111,7 +111,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: TellStickConfigEntry) ->
         async_dispatcher_send(
             hass, SIGNAL_PACKET.format(entry_id=entry.entry_id), packet
         )
-        if packet.get("class") == "command":
+        # A press arrives several times; fire the event once
+        if packet.get("class") == "command" and not packet["repeat"]:
             hass.bus.async_fire(
                 EVENT_RF_COMMAND,
                 {

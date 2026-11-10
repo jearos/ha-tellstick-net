@@ -21,6 +21,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from .rf_filter import DROP, REPEAT, CommandFilter
 from .tellsticknet import const as tn_const
 from .tellsticknet.protocol import (
     _decode_command,
@@ -104,8 +105,16 @@ class _DiscoveryProtocol(asyncio.DatagramProtocol):
 async def async_discover(
     timeout: float = 3.0, target: str = "255.255.255.255"
 ) -> list[DiscoveredDevice]:
-    """Broadcast a discovery query (or unicast it to `target`)."""
+    """Broadcast a discovery query (or unicast it to `target`).
+
+    Raises OSError (socket.gaierror) if `target` is a name that won't resolve.
+    """
     loop = asyncio.get_running_loop()
+    # Resolve a hostname here: sendto would do it blocking, inside the loop
+    infos = await loop.getaddrinfo(
+        target, DISCOVERY_PORT, family=socket.AF_INET, type=socket.SOCK_DGRAM
+    )
+    address = infos[0][4]
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sock.setblocking(False)
@@ -116,7 +125,7 @@ async def async_discover(
     try:
         # Repeat a few times; UDP broadcast is lossy on some Wi-Fi setups.
         for _ in range(3):
-            transport.sendto(b"D", (target, DISCOVERY_PORT))
+            transport.sendto(b"D", address)
             await asyncio.sleep(timeout / 3)
     finally:
         transport.close()
@@ -172,6 +181,7 @@ class TellStickHub:
         self._available = False
         # Protocol/model kinds already reported as unsupported.
         self._unsupported: set[str] = set()
+        self._filter = CommandFilter()
 
     @property
     def available(self) -> bool:
@@ -358,5 +368,12 @@ class TellStickHub:
         except Exception as err:  # noqa: BLE001 - decoders raise anything
             _LOGGER.debug("Could not decode %s: %r", data, err)
             return
-        if packet:
-            self._on_packet(packet)
+        if not packet:
+            return
+        kind = self._filter.classify(packet)
+        if kind == DROP:
+            _LOGGER.debug("Dropped phantom %s", packet)
+            return
+        # Repeats still update state; events and learning skip or use them
+        packet["repeat"] = kind == REPEAT
+        self._on_packet(packet)

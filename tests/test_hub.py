@@ -100,6 +100,8 @@ HASTA = (
     b"7:RawDatah8:protocol5:hasta5:modelE:selflearningv24:datai1234ss"
 )
 X10 = b"7:RawDatah8:protocol3:x104:datai1234ss"
+# The firmware's Everflourish decoder firing on a Nexa signal (phantom)
+EVERFLOURISH = b"7:RawDatah8:protocolC:everflourish4:datai5D2C00ss"
 
 
 class ParseTests(unittest.TestCase):
@@ -197,6 +199,28 @@ class HubTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             self.hub.unsupported_kinds, ["hasta selflearningv2", "oregon 0x5D60"]
         )
+
+    async def test_repeated_press_is_flagged(self):
+        await wait_for(lambda: self.device.listener is not None)
+        self.device.emit(NEXA_ON)
+        self.device.emit(NEXA_ON)
+        await wait_for(lambda: len(self.packets) == 2)
+        self.assertEqual([p["repeat"] for p in self.packets], [False, True])
+
+    async def test_phantom_everflourish_dropped(self):
+        await wait_for(lambda: self.device.listener is not None)
+        for packet in (NEXA_ON, EVERFLOURISH, MANDOLYN):
+            self.device.emit(packet)
+        await wait_for(lambda: len(self.packets) == 2)
+        self.assertEqual(
+            [p["protocol"] for p in self.packets], ["arctech", "mandolyn"]
+        )
+
+    async def test_discover_resolves_hostname(self):
+        found = await hub_mod.async_discover(timeout=0.3, target="localhost")
+        self.assertEqual([d.mac for d in found], [MAC])
+        with self.assertRaises(OSError):
+            await hub_mod.async_discover(timeout=0.3, target="no-such-host.invalid")
 
     async def test_turn_on_matches_firmware_format(self):
         await wait_for(lambda: self.device.listener is not None)

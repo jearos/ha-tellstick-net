@@ -37,7 +37,9 @@ goes through Telldus Live.
 - **Buttons** (untested): a remote or wall-switch button as an event entity
   (on/off presses), for the automation editor.
 - **Remote events**: every decoded remote/wall-switch press fires a
-  `tellstick_local_command` event for automations.
+  `tellstick_local_command` event for automations, once per press (the
+  radio repeats are filtered, as are phantom Everflourish presses the
+  firmware decodes from Nexa signals).
 - **Follows the device** if it gets a new IP address (DHCP discovery, plus
   rediscovery by MAC while it's offline).
 - **Firmware check**: a repair issue if the device runs firmware without the
