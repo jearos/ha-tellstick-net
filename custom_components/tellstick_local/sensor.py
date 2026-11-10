@@ -1,4 +1,4 @@
-"""433 MHz temperature/humidity sensors seen by the TellStick Net.
+"""433 MHz sensors (temperature, humidity, wind, rain) seen by the TellStick Net.
 
 Sensors can't be configured up front (they announce nothing but an ID), so
 an entity is created the first time a sensor is heard. Entities are keyed on
@@ -17,7 +17,14 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, UnitOfTemperature
+from homeassistant.const import (
+    DEGREE,
+    PERCENTAGE,
+    UnitOfPrecipitationDepth,
+    UnitOfSpeed,
+    UnitOfTemperature,
+    UnitOfVolumetricFlux,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -44,6 +51,43 @@ DESCRIPTIONS: dict[str, SensorEntityDescription] = {
         device_class=SensorDeviceClass.HUMIDITY,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
+    ),
+    "windaverage": SensorEntityDescription(
+        key="windaverage",
+        device_class=SensorDeviceClass.WIND_SPEED,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfSpeed.METERS_PER_SECOND,
+    ),
+    "windgust": SensorEntityDescription(
+        key="windgust",
+        translation_key="wind_gust",
+        device_class=SensorDeviceClass.WIND_SPEED,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfSpeed.METERS_PER_SECOND,
+    ),
+    "winddirection": SensorEntityDescription(
+        key="winddirection",
+        translation_key="wind_direction",
+        # Both appeared after HA 2025.2 (the minimum); a plain average of
+        # angles is wrong, so no state class without MEASUREMENT_ANGLE.
+        device_class=getattr(SensorDeviceClass, "WIND_DIRECTION", None),
+        state_class=getattr(SensorStateClass, "MEASUREMENT_ANGLE", None),
+        native_unit_of_measurement=DEGREE,
+    ),
+    "raintotal": SensorEntityDescription(
+        key="raintotal",
+        translation_key="rain_total",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        # Resets when the sensor's batteries are changed
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfPrecipitationDepth.MILLIMETERS,
+    ),
+    "rainrate": SensorEntityDescription(
+        key="rainrate",
+        translation_key="rain_rate",
+        device_class=SensorDeviceClass.PRECIPITATION_INTENSITY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfVolumetricFlux.MILLIMETERS_PER_HOUR,
     ),
 }
 
@@ -119,7 +163,7 @@ async def async_setup_entry(
 
 
 class TellStickSensor(TellStickEntity, RestoreSensor):
-    """One quantity (temperature or humidity) of one RF sensor."""
+    """One quantity (temperature, humidity, wind, rain) of one RF sensor."""
 
     def __init__(
         self,

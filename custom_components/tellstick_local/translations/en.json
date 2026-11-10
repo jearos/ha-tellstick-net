@@ -126,5 +126,21 @@
         "dimmer": "Dimmer"
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "wind_gust": {
+        "name": "Wind gust"
+      },
+      "wind_direction": {
+        "name": "Wind direction"
+      },
+      "rain_total": {
+        "name": "Rain total"
+      },
+      "rain_rate": {
+        "name": "Rain rate"
+      }
+    }
   }
 }

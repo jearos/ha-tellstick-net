@@ -22,7 +22,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from .tellsticknet import const as tn_const
-from .tellsticknet.protocol import decode_packet, encode, encode_packet
+from .tellsticknet.protocol import (
+    _decode_command,
+    decode_packet,
+    encode,
+    encode_packet,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,6 +54,25 @@ class DiscoveredDevice:
     product: str
     mac: str
     firmware: str
+
+
+def unsupported_kind(data: bytes) -> str | None:
+    """Name the protocol/model of a RawData packet no decoder handles.
+
+    Used to tell the user, once per kind, which 433 MHz devices are in range
+    but not supported yet (e.g. "oregon 0x5D60", "hasta selflearningv2").
+    """
+    try:
+        command, args = _decode_command(data)
+    except Exception:  # noqa: BLE001 - not even a LiveMessage
+        return None
+    if command != "RawData" or not isinstance(args.get("protocol"), str):
+        return None
+    model = args.get("model")
+    if isinstance(model, int):
+        # Oregon reports its sensor ID as a number, e.g. 0x1A2D = 6701.
+        model = f"0x{model:04X}"
+    return f"{args['protocol']} {model}" if model else args["protocol"]
 
 
 def parse_discovery_reply(data: bytes, host: str) -> DiscoveredDevice | None:
@@ -146,6 +170,8 @@ class TellStickHub:
         self._task: asyncio.Task | None = None
         self._last_seen: float | None = None
         self._available = False
+        # Protocol/model kinds already reported as unsupported.
+        self._unsupported: set[str] = set()
 
     @property
     def available(self) -> bool:
@@ -285,6 +311,19 @@ class TellStickHub:
             self._register()
             self._set_available(True)
 
+    def _log_unsupported(self, data: bytes) -> None:
+        kind = unsupported_kind(data)
+        if kind is None or kind in self._unsupported:
+            _LOGGER.debug("No decoder for %s", data)
+            return
+        self._unsupported.add(kind)
+        _LOGGER.info(
+            "Heard a 433 MHz device this integration can't decode yet: %s "
+            "(logged once per kind; packet %s)",
+            kind,
+            data,
+        )
+
     def _datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
         if addr[0] != self.host:
             return
@@ -302,6 +341,9 @@ class TellStickHub:
         _LOGGER.debug("<- %s %s", self.host, data)
         try:
             packet = decode_packet(data)
+        except NotImplementedError:
+            self._log_unsupported(data)
+            return
         except Exception as err:  # noqa: BLE001 - decoders raise anything
             _LOGGER.debug("Could not decode %s: %r", data, err)
             return

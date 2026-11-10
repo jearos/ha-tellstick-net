@@ -313,7 +313,10 @@ def _decode(**packet):
                 dict(name=name, value=value) for name, value in data.items()
             ]
         return packet
-    raise NotImplementedError
+    # Local change (tellstick_local): ValueError, not NotImplementedError. The
+    # protocol is known, this packet just didn't match; NotImplementedError is
+    # kept for protocols/models without a decoder (logged as unsupported).
+    raise ValueError("Packet not recognised by %s" % module.__name__)
 
 
 def encode(**device):

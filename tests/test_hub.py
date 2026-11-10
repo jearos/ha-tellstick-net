@@ -92,7 +92,26 @@ async def wait_for(predicate, timeout=2.0):
         await asyncio.sleep(0.01)
 
 
+# Oregon BTHR918 (0x5D60): fw17 reports it, we have no decoder.
+OREGON_5D60 = (
+    b"7:RawDatah5:class6:sensor8:protocol6:oregon5:modeli5D60s4:datai1234ss"
+)
+HASTA = (
+    b"7:RawDatah8:protocol5:hasta5:modelE:selflearningv24:datai1234ss"
+)
+X10 = b"7:RawDatah8:protocol3:x104:datai1234ss"
+
+
 class ParseTests(unittest.TestCase):
+    def test_unsupported_kind_names_protocol_and_model(self):
+        self.assertEqual(hub_mod.unsupported_kind(OREGON_5D60), "oregon 0x5D60")
+        self.assertEqual(hub_mod.unsupported_kind(HASTA), "hasta selflearningv2")
+        self.assertEqual(hub_mod.unsupported_kind(X10), "x10")
+
+    def test_unsupported_kind_ignores_garbage(self):
+        self.assertIsNone(hub_mod.unsupported_kind(b"not a livemessage"))
+        self.assertIsNone(hub_mod.unsupported_kind(b"4:pings"))
+
     def test_discovery_reply_drops_secret(self):
         d = hub_mod.parse_discovery_reply(b"TellStickNet:ACCA54000001:SECRET:17", "10.0.0.5")
         self.assertEqual(d, hub_mod.DiscoveredDevice("10.0.0.5", "TellStickNet", MAC, "17"))
@@ -164,6 +183,17 @@ class HubTests(unittest.IsolatedAsyncioTestCase):
         self.device.emit(MANDOLYN)
         await wait_for(lambda: self.packets)
         self.assertEqual(len(self.packets), 1)
+
+    async def test_unsupported_logged_once_per_kind(self):
+        await wait_for(lambda: self.device.listener is not None)
+        with self.assertLogs(hub_mod._LOGGER, "DEBUG") as logs:
+            for packet in (OREGON_5D60, OREGON_5D60, HASTA, MANDOLYN):
+                self.device.emit(packet)
+            await wait_for(lambda: self.packets)
+        infos = [r.getMessage() for r in logs.records if r.levelname == "INFO"]
+        self.assertEqual(len(infos), 2)
+        self.assertIn("oregon 0x5D60", infos[0])
+        self.assertIn("hasta selflearningv2", infos[1])
 
     async def test_turn_on_matches_firmware_format(self):
         await wait_for(lambda: self.device.listener is not None)

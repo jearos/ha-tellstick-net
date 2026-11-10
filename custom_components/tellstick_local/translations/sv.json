@@ -1,0 +1,18 @@
+{
+  "entity": {
+    "sensor": {
+      "wind_gust": {
+        "name": "Vindby"
+      },
+      "wind_direction": {
+        "name": "Vindriktning"
+      },
+      "rain_total": {
+        "name": "Regn totalt"
+      },
+      "rain_rate": {
+        "name": "Regnintensitet"
+      }
+    }
+  }
+}

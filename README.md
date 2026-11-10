@@ -21,8 +21,8 @@ goes through Telldus Live.
 
 - **Discovery**: finds TellStick Nets on the LAN, and picks them up
   automatically via DHCP.
-- **Sensors**: 433 MHz temperature/humidity sensors are created automatically
-  the first time they're heard. Push-based, no polling.
+- **Sensors**: 433 MHz temperature/humidity, wind and rain sensors are
+  created automatically the first time they're heard. Push-based, no polling.
 - **Keeps history across battery changes**: many cheap sensors pick a new
   random ID when the battery is changed. *Replace sensor* moves the new ID onto
   the old sensor, keeping its entities, name, area and history.
@@ -50,6 +50,15 @@ goes through Telldus Live.
 
 Decoders for Fine Offset, Mandolyn and other sensors are included but
 untested. Reports (working or not) are welcome as GitHub issues.
+
+Oregon Scientific models decoded (only 0x1A2D tested on hardware):
+
+| ID | Sensors (e.g.) | Values |
+|---|---|---|
+| 0x1A2D, 0x1D20, 0xF824, 0xF8B4 | THGR122NX, THGR228N, THGN123N, THGR810, THGN801 | temperature, humidity |
+| 0xEA4C, 0xEC40, 0xC844 | THN132N, THWR800 | temperature |
+| 0x1984, 0x1994 | WGR800 | wind speed, gust, direction |
+| 0x2914 | PCR800 | rain total, rain rate |
 
 ## Requirements
 
@@ -224,7 +233,8 @@ missed command would be dangerous.
   code-wheel/old Nexa, no other protocols). Dimmers are untested.
 - Absolute dim commands sent by other controllers (e.g. a Nexa Bridge) are
   not reported by the TellStick, so their brightness can't be followed.
-- Sensors: temperature and humidity only (no rain/wind yet).
+- Sensors: no UV (Oregon 0xD874/0xEC70), no barometer (0x5D60) yet. See
+  *Which other devices are in range?* below to find out what's around.
 - The device supports one listener at a time. Running this next to another
   local client (e.g. the tellsticknet MQTT bridge) makes them steal events
   from each other.
@@ -257,6 +267,12 @@ missed command would be dangerous.
   it with *Add switch by pressing a remote*.
 - Check the range: the TellStick Net transmits on 433 MHz from where it
   stands.
+
+**Which other devices are in range?**
+- With the log level at `info` (or `debug`), each kind of 433 MHz device the
+  TellStick Net hears but this integration can't decode yet is logged once,
+  e.g. `Heard a 433 MHz device this integration can't decode yet: oregon
+  0x5D60`. Handy before opening a feature request.
 
 For debug logs, add to `configuration.yaml`:
 
