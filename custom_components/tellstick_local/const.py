@@ -20,6 +20,11 @@ CONF_NEW_SENSORS_ENABLED = "new_sensors_enabled"
 # Sensor quantity shown as a battery binary sensor, not a sensor
 QUANTITY_BATTERY_LOW = "battery_low"
 
+
+def quantity_domain(quantity: str) -> str:
+    """Entity platform that shows a sensor quantity."""
+    return "binary_sensor" if quantity == QUANTITY_BATTERY_LOW else "sensor"
+
 DEFAULT_NEW_SENSORS_ENABLED = True
 
 # Arctech/Nexa self-learning address space
@@ -33,6 +38,8 @@ EVENT_RF_COMMAND = f"{DOMAIN}_command"
 
 SIGNAL_PACKET = f"{DOMAIN}_packet_{{entry_id}}"
 SIGNAL_AVAILABLE = f"{DOMAIN}_available_{{entry_id}}"
+# sensor.py, after recording a reading: (KnownSensor, {quantity: value})
+SIGNAL_SENSOR_HEARD = f"{DOMAIN}_sensor_heard_{{entry_id}}"
 
 STORAGE_VERSION = 1
 # {"sensors": [KnownSensor.to_dict(), ...]}, see known_sensors.py

@@ -123,8 +123,35 @@ class CommandFilterTests(unittest.TestCase):
         # An arctech frame that failed to decode never reaches classify()
         f = rf.CommandFilter(clock=self.clock)
         f.saw_frame("arctech")
-        self.clock.now += 0.4
+        self.clock.now += 0.087  # longest delay captured
         self.assertEqual(f.classify(everflourish()), rf.DROP)
+
+    def test_everflourish_shortly_after_nexa_kept(self):
+        kinds = [k for _, k in self.run_filter([(0, nexa()), (0.3, everflourish())])]
+        self.assertEqual(kinds, [rf.NEW, rf.NEW])
+
+    def test_quick_toggle_is_three_presses(self):
+        # Door contact: open, close, open, each within a second
+        kinds = [
+            k
+            for _, k in self.run_filter(
+                [(0, nexa()), (0.4, nexa(method="turnoff")), (0.8, nexa())]
+            )
+        ]
+        self.assertEqual(kinds, [rf.NEW, rf.NEW, rf.NEW])
+
+    def test_sartano_buttons_kept_apart(self):
+        def sartano(code):
+            return {
+                "class": "command", "protocol": "sartano", "model": "codeswitch",
+                "code": code, "method": "turnon",
+            }
+
+        kinds = [
+            k
+            for _, k in self.run_filter([(0, sartano("0000000001")), (0.3, sartano("1111100000"))])
+        ]
+        self.assertEqual(kinds, [rf.NEW, rf.NEW])
 
     def test_real_everflourish_kept(self):
         kinds = [

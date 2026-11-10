@@ -5,8 +5,8 @@ Door and motion sensors send the same Arctech frames as a remote: "on" when
 a door opens or motion is seen, "off" when it closes. Motion sensors that
 never send "off" are turned off after MOTION_OFF_AFTER seconds.
 
-Battery entities are created like the sensor's other entities, the first
-time a reading carries the flag.
+Battery entities are created like the sensor's other entities, when
+sensor.py has recorded a reading that carries the flag.
 """
 
 from __future__ import annotations
@@ -34,12 +34,12 @@ from .const import (
     DEFAULT_NEW_SENSORS_ENABLED,
     MOTION_OFF_AFTER,
     QUANTITY_BATTERY_LOW,
-    SIGNAL_PACKET,
+    SIGNAL_SENSOR_HEARD,
     TYPE_DOOR,
     TYPE_MOTION,
 )
 from .entity import SelflearningEntity, TellStickEntity, sensor_device_info
-from .known_sensors import KnownSensor, radio_key
+from .known_sensors import KnownSensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,19 +83,9 @@ async def async_setup_entry(
         async_add_entities(restored)
 
     @callback
-    def handle_packet(packet: dict[str, Any]) -> None:
-        key = radio_key(packet)
-        low = next(
-            (
-                item.get("value")
-                for item in packet.get("data") or []
-                if item.get("name") == QUANTITY_BATTERY_LOW
-            ),
-            None,
-        )
-        # sensor.py records the sensor; a brand-new one shows up here from
-        # its next reading
-        if key is None or low is None or (sensor := known.find(key)) is None:
+    def handle_reading(sensor: KnownSensor, readings: dict[str, Any]) -> None:
+        # Sent by sensor.py once it has recorded the sensor
+        if (low := readings.get(QUANTITY_BATTERY_LOW)) is None:
             return
         entity = batteries.get(sensor.uid)
         if entity is None:
@@ -105,7 +95,7 @@ async def async_setup_entry(
 
     entry.async_on_unload(
         async_dispatcher_connect(
-            hass, SIGNAL_PACKET.format(entry_id=entry.entry_id), handle_packet
+            hass, SIGNAL_SENSOR_HEARD.format(entry_id=entry.entry_id), handle_reading
         )
     )
 
@@ -168,23 +158,31 @@ class TellStickBattery(TellStickEntity, BinarySensorEntity, RestoreEntity):
         self._attr_unique_id = sensor_unique_id(self._mac, sensor.uid, QUANTITY_BATTERY_LOW)
         self._attr_device_info = sensor_device_info(self._mac, sensor, self._via_device)
         self._pending: bool | None = None
+        # Kept apart from the state: a disabled entity never gets one
+        self._logged_low = False
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         if self._pending is not None:
             self._attr_is_on, self._pending = self._pending, None
-        elif (last := await self.async_get_last_state()) is not None:
+        elif (last := await self.async_get_last_state()) is not None and last.state in (
+            "on",
+            "off",
+        ):
+            # Not "unavailable"/"unknown": that would read as battery OK
             self._attr_is_on = last.state == "on"
+            self._logged_low = self._attr_is_on
 
     @callback
     def update_value(self, low: bool) -> None:
-        if low and not self._attr_is_on:
+        if low and not self._logged_low:
             # Unconfirmed on real hardware so far: worth a line in the log
             _LOGGER.info(
                 "%s %s sensor %s reports low battery",
                 self._sensor.protocol, self._sensor.model, self._sensor.sensor_id,
             )
-        if self.hass is None:
+        self._logged_low = low
+        if self.hass is None:  # not added yet, or disabled
             self._pending = low
             return
         self._attr_is_on = low

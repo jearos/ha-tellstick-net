@@ -36,7 +36,6 @@ from .const import (
     CONF_SWITCHES,
     CONF_TYPE,
     CONF_UNIT,
-    QUANTITY_BATTERY_LOW,
     DEFAULT_NEW_SENSORS_ENABLED,
     DOMAIN,
     HOUSE_MAX,
@@ -49,6 +48,7 @@ from .const import (
     TYPE_SWITCH,
     UNIT_MAX,
     UNIT_MIN,
+    quantity_domain,
 )
 from .hub import DiscoveredDevice, async_discover
 from .rf_filter import LEARN_FRAMES, LEARN_WINDOW, NEW, CommandFilter
@@ -237,6 +237,8 @@ class TellStickOptionsFlow(OptionsFlow):
         readings = []
         entity_registry = er.async_get(self.hass)
         for quantity in sensor.quantities:
+            if quantity_domain(quantity) != "sensor":
+                continue  # readings only, not the battery flag
             entity_id = entity_registry.async_get_entity_id(
                 "sensor", DOMAIN, sensor_unique_id(mac, sensor.uid, quantity)
             )
@@ -479,9 +481,8 @@ class TellStickOptionsFlow(OptionsFlow):
         # kept sensor's entities (and their history) take over from here.
         entity_registry = er.async_get(self.hass)
         for quantity in dropped.quantities if dropped else []:
-            domain = "binary_sensor" if quantity == QUANTITY_BATTERY_LOW else "sensor"
             if entity_id := entity_registry.async_get_entity_id(
-                domain, DOMAIN, sensor_unique_id(mac, new_uid, quantity)
+                quantity_domain(quantity), DOMAIN, sensor_unique_id(mac, new_uid, quantity)
             ):
                 entity_registry.async_remove(entity_id)
         device_registry = dr.async_get(self.hass)

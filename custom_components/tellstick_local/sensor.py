@@ -26,7 +26,10 @@ from homeassistant.const import (
     UnitOfVolumetricFlux,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.dispatcher import (
+    async_dispatcher_connect,
+    async_dispatcher_send,
+)
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import TellStickConfigEntry, sensor_unique_id
@@ -35,6 +38,7 @@ from .const import (
     DEFAULT_NEW_SENSORS_ENABLED,
     QUANTITY_BATTERY_LOW,
     SIGNAL_PACKET,
+    SIGNAL_SENSOR_HEARD,
 )
 from .entity import TellStickEntity, sensor_device_info
 from .known_sensors import KnownSensor, radio_key
@@ -131,19 +135,19 @@ async def async_setup_entry(
         key = radio_key(packet)
         if key is None:
             return
-        values = {
-            item.get("name"): item.get("value")
-            for item in packet.get("data") or []
-            if item.get("name") in DESCRIPTIONS
+        readings = {
+            item.get("name"): item.get("value") for item in packet.get("data") or []
         }
+        values = {q: v for q, v in readings.items() if q in DESCRIPTIONS}
         if not values:
             return
         # The battery flag is a quantity too; binary_sensor.py shows it
-        battery = any(
-            item.get("name") == QUANTITY_BATTERY_LOW for item in packet["data"]
-        )
-        sensor, _ = known.heard(
-            key, [*values, QUANTITY_BATTERY_LOW] if battery else values
+        battery = {
+            q: v for q, v in readings.items() if q == QUANTITY_BATTERY_LOW
+        }
+        sensor, _ = known.heard(key, [*values, *battery])
+        async_dispatcher_send(
+            hass, SIGNAL_SENSOR_HEARD.format(entry_id=entry.entry_id), sensor, battery
         )
         added: list[TellStickSensor] = []
         for quantity, value in values.items():
