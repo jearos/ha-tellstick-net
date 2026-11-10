@@ -34,16 +34,16 @@
       "init": {
         "title": "TellStick Net",
         "menu_options": {
-          "add_switch": "Add Nexa self-learning switch or dimmer",
-          "learn_switch": "Add switch or dimmer by pressing a remote",
-          "remove_switch": "Remove switches and dimmers",
+          "add_switch": "Add Nexa self-learning device by code",
+          "learn_switch": "Add device by pressing a remote or triggering a sensor",
+          "remove_switch": "Remove self-learning devices",
           "replace_sensor": "Replace sensor (new ID after battery change)",
           "settings": "Settings"
         }
       },
       "add_switch": {
-        "title": "Add Nexa self-learning switch or dimmer",
-        "description": "To pair a new receiver: keep the random house code, save, put the receiver in learn mode and turn the new switch or dimmer on. To control a receiver that already listens to a remote, enter that remote's house code and unit (press the remote and look for a tellstick_local_command event), or use \"Add switch or dimmer by pressing a remote\".",
+        "title": "Add Nexa self-learning device",
+        "description": "To pair a new receiver: keep the random house code, save, put the receiver in learn mode and turn the new switch or dimmer on. To control a receiver that already listens to a remote, enter that remote's house code and unit (press the remote and look for a tellstick_local_command event), or use \"Add switch or dimmer by pressing a remote\". Door, motion and button types are transmitters: enter the code they send, or use \"Add device by pressing a remote or triggering a sensor\".",
         "data": {
           "name": "Name",
           "type": "Type",
@@ -52,13 +52,13 @@
         },
         "data_description": {
           "name": "Leave empty to name it after its house code and unit.",
-          "type": "Dimmer: for self-learning dimmer receivers. Brightness is sent in 16 steps."
+          "type": "Switch/dimmer: a receiver Home Assistant controls (dimmers get brightness in 16 steps). Door/motion sensor: a contact or PIR sensor sending on/off. Button: a remote or wall-switch button, as an event entity for automations."
         }
       },
       "remove_switch": {
-        "title": "Remove switches and dimmers",
+        "title": "Remove self-learning devices",
         "data": {
-          "switches": "Switches and dimmers to remove"
+          "switches": "Devices to remove"
         }
       },
       "settings": {
@@ -83,34 +83,34 @@
         }
       },
       "learn_timeout": {
-        "title": "No remote heard",
-        "description": "No self-learning remote or wall switch (Nexa/Proove/Arctech) was heard. Make sure it's within range of the TellStick and press an on or off button (not 'all on/off').",
+        "title": "Nothing heard",
+        "description": "No self-learning remote, wall switch or sensor (Nexa/Proove/Arctech) was heard. Make sure it's within range of the TellStick and press an on or off button (not 'all on/off'), open a door contact or walk past a motion sensor.",
         "menu_options": {
           "learn_switch": "Try again",
           "init": "Back"
         }
       },
       "learn_confirm": {
-        "title": "Remote found",
-        "description": "Heard house code {house}, unit {unit}. The new switch or dimmer sends exactly this code, so receivers that obey this button will also obey Home Assistant - no pairing needed. Pressing the button later also updates its on/off state in Home Assistant.",
+        "title": "Code found",
+        "description": "Heard house code {house}, unit {unit}. As a switch or dimmer it sends exactly this code, so receivers that obey this button also obey Home Assistant - no pairing needed. As a door/motion sensor or button it follows what this transmitter sends.",
         "data": {
           "name": "Name",
           "type": "Type"
         },
         "data_description": {
-          "type": "Choose dimmer if the receiver this button controls is a dimmer."
+          "type": "Dimmer if the receiver this button controls is a dimmer; door, motion or button if the code came from a sensor or a remote you only want to use in automations."
         }
       }
     },
     "error": {
-      "already_exists": "A switch or dimmer with this house code and unit already exists.",
+      "already_exists": "A device with this house code and unit already exists.",
       "same_sensor": "Pick two different sensors."
     },
     "progress": {
-      "press_remote": "Press an on or off button on the remote or wall switch you want to copy. Listening for {seconds} seconds..."
+      "press_remote": "Press an on or off button on the remote or wall switch, open the door contact or trigger the motion sensor. Listening for {seconds} seconds..."
     },
     "abort": {
-      "already_exists": "A switch or dimmer with house code {house}, unit {unit} already exists."
+      "already_exists": "A device with house code {house}, unit {unit} already exists."
     }
   },
   "issues": {
@@ -123,7 +123,10 @@
     "receiver_type": {
       "options": {
         "switch": "On/off switch",
-        "dimmer": "Dimmer"
+        "dimmer": "Dimmer",
+        "door": "Door/window sensor",
+        "motion": "Motion sensor",
+        "button": "Button (remote, wall switch)"
       }
     }
   },
@@ -140,6 +143,18 @@
       },
       "rain_rate": {
         "name": "Rain rate"
+      }
+    },
+    "event": {
+      "button": {
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "turn_on": "On",
+              "turn_off": "Off"
+            }
+          }
+        }
       }
     }
   }

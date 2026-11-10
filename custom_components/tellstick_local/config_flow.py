@@ -41,7 +41,10 @@ from .const import (
     HOUSE_MAX,
     HOUSE_MIN,
     SIGNAL_PACKET,
+    TYPE_BUTTON,
     TYPE_DIMMER,
+    TYPE_DOOR,
+    TYPE_MOTION,
     TYPE_SWITCH,
     UNIT_MAX,
     UNIT_MIN,
@@ -59,7 +62,7 @@ NEW_SENSOR = "new_sensor"
 def _type_selector() -> selector.SelectSelector:
     return selector.SelectSelector(
         selector.SelectSelectorConfig(
-            options=[TYPE_SWITCH, TYPE_DIMMER],
+            options=[TYPE_SWITCH, TYPE_DIMMER, TYPE_DOOR, TYPE_MOTION, TYPE_BUTTON],
             translation_key="receiver_type",
             mode=selector.SelectSelectorMode.LIST,
         )
@@ -67,10 +70,10 @@ def _type_selector() -> selector.SelectSelector:
 
 
 def _receiver(name: str, house: int, unit: int, kind: str) -> dict[str, Any]:
-    """A switches-list item; the type key is only stored for dimmers."""
+    """A switches-list item; the type key is stored for all but switches."""
     item: dict[str, Any] = {CONF_NAME: name, CONF_HOUSE: house, CONF_UNIT: unit}
-    if kind == TYPE_DIMMER:
-        item[CONF_TYPE] = TYPE_DIMMER
+    if kind != TYPE_SWITCH:
+        item[CONF_TYPE] = kind
     return item
 
 

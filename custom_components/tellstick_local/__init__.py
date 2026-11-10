@@ -30,7 +30,10 @@ from .const import (
     SIGNAL_PACKET,
     STORAGE_KEY,
     STORAGE_VERSION,
+    TYPE_BUTTON,
     TYPE_DIMMER,
+    TYPE_DOOR,
+    TYPE_MOTION,
     TYPE_SWITCH,
     selflearning_prefix,
     selflearning_unique_id,
@@ -38,7 +41,13 @@ from .const import (
 from .hub import TellStickHub
 from .known_sensors import KnownSensors
 
-PLATFORMS = [Platform.LIGHT, Platform.SENSOR, Platform.SWITCH]
+PLATFORMS = [
+    Platform.BINARY_SENSOR,
+    Platform.EVENT,
+    Platform.LIGHT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
 
 # last_seen alone changes on every reception; don't hit the disk for that
 _LAST_SEEN_SAVE_DELAY = 900
@@ -194,14 +203,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: TellStickConfigEntry) ->
 
 @callback
 def _async_remove_stale_receivers(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Drop entities and devices of switches/dimmers no longer configured.
+    """Drop entities and devices of self-learning devices no longer configured.
 
     Also drops an entity left in the wrong platform, so a receiver whose
     type changed is recreated as the right kind.
     """
     mac = entry.data[CONF_MAC]
     prefix = selflearning_prefix(mac)
-    domain_of = {TYPE_SWITCH: "switch", TYPE_DIMMER: "light"}
+    domain_of = {
+        TYPE_SWITCH: "switch",
+        TYPE_DIMMER: "light",
+        TYPE_DOOR: "binary_sensor",
+        TYPE_MOTION: "binary_sensor",
+        TYPE_BUTTON: "event",
+    }
     wanted = {
         selflearning_unique_id(mac, cfg[CONF_HOUSE], cfg[CONF_UNIT]): domain_of.get(
             cfg.get(CONF_TYPE, TYPE_SWITCH), "switch"
@@ -211,7 +226,7 @@ def _async_remove_stale_receivers(hass: HomeAssistant, entry: ConfigEntry) -> No
     entities = er.async_get(hass)
     for reg_entry in er.async_entries_for_config_entry(entities, entry.entry_id):
         if (
-            reg_entry.domain in ("switch", "light")
+            reg_entry.domain in domain_of.values()
             and reg_entry.unique_id.startswith(prefix)
             and wanted.get(reg_entry.unique_id) != reg_entry.domain
         ):

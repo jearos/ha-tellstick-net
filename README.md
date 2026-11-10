@@ -31,6 +31,11 @@ goes through Telldus Live.
   its buttons.
 - **Dimmers** (untested): self-learning dimmer receivers as lights with
   brightness (16 steps), added the same way as switches.
+- **Door/window and motion sensors** (untested): self-learning transmitters
+  such as Nexa contacts and PIR sensors as binary sensors. Motion turns off
+  after 60 s if the sensor never sends "off".
+- **Buttons** (untested): a remote or wall-switch button as an event entity
+  (on/off presses), for the automation editor.
 - **Remote events**: every decoded remote/wall-switch press fires a
   `tellstick_local_command` event for automations.
 - **Follows the device** if it gets a new IP address (DHCP discovery, plus
@@ -46,6 +51,7 @@ goes through Telldus Live.
 | Sensors | Oregon Scientific temperature/humidity |
 | Switches | Nexa self-learning receivers and remotes |
 | Dimmers | not yet - reports welcome |
+| Door/motion sensors, buttons | not yet - reports welcome |
 | Home Assistant | 2026.10 |
 
 Decoders for Fine Offset, Mandolyn and other sensors are included but
@@ -231,6 +237,9 @@ missed command would be dangerous.
 
 - Switches and dimmers: only Arctech self-learning for now (no
   code-wheel/old Nexa, no other protocols). Dimmers are untested.
+- One device per house code and unit: a remote button copied as a switch
+  can't also be added as a button entity (its presses still fire
+  `tellstick_local_command` events, and the switch follows them).
 - Absolute dim commands sent by other controllers (e.g. a Nexa Bridge) are
   not reported by the TellStick, so their brightness can't be followed.
 - Sensors: no UV (Oregon 0xD874/0xEC70), no barometer (0x5D60) yet. See

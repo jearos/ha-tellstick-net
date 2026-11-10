@@ -55,11 +55,13 @@ class TellStickEntity(Entity):
 
 
 class SelflearningEntity(TellStickEntity, RestoreEntity):
-    """A Nexa/Proove/Arctech self-learning receiver (switch or dimmer).
+    """A Nexa/Proove/Arctech self-learning code: a receiver (switch, dimmer)
+    or a transmitter (door/motion sensor, button).
 
-    433 MHz receivers don't report state, so state is optimistic (assumed)
-    and restored across restarts. It also follows matching RF commands, e.g.
-    when the receiver's own remote or wall switch is pressed.
+    433 MHz receivers don't report state, so their state is optimistic
+    (assumed) and restored across restarts. It also follows matching RF
+    commands, e.g. when the receiver's own remote or wall switch is pressed.
+    Transmitters override ``_handle_command``.
     """
 
     _attr_assumed_state = True
@@ -112,7 +114,9 @@ class SelflearningEntity(TellStickEntity, RestoreEntity):
         # A group command addresses every unit of the house code
         if packet.get("group") != 1 and packet.get("unit") != self._unit:
             return
-        method = packet.get("method")
+        self._handle_command(packet.get("method"))
+
+    def _handle_command(self, method: Any) -> None:
         if method == "turnon":
             self._attr_is_on = True
         elif method == "turnoff":

@@ -10,6 +10,12 @@ CONF_UNIT = "unit"
 CONF_TYPE = "type"
 TYPE_SWITCH = "switch"
 TYPE_DIMMER = "dimmer"
+# Self-learning transmitters (they send the same frames as a remote)
+TYPE_DOOR = "door"
+TYPE_MOTION = "motion"
+TYPE_BUTTON = "button"
+# Motion sensors that only send "on" are turned off after this many seconds
+MOTION_OFF_AFTER = 60
 CONF_NEW_SENSORS_ENABLED = "new_sensors_enabled"
 
 DEFAULT_NEW_SENSORS_ENABLED = True

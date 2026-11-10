@@ -177,6 +177,17 @@ class TellStickHub:
     def available(self) -> bool:
         return self._available
 
+    @property
+    def unsupported_kinds(self) -> list[str]:
+        """Protocol/model kinds heard that no decoder handles, since start."""
+        return sorted(self._unsupported)
+
+    @property
+    def seconds_since_seen(self) -> float | None:
+        if self._last_seen is None:
+            return None
+        return time.monotonic() - self._last_seen
+
     async def async_start(self) -> None:
         loop = asyncio.get_running_loop()
         # Ephemeral local port: the firmware sends RF events back to whatever

@@ -13,6 +13,18 @@
       "rain_rate": {
         "name": "Regnintensitet"
       }
+    },
+    "event": {
+      "button": {
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "turn_on": "På",
+              "turn_off": "Av"
+            }
+          }
+        }
+      }
     }
   }
 }

@@ -194,6 +194,9 @@ class HubTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(infos), 2)
         self.assertIn("oregon 0x5D60", infos[0])
         self.assertIn("hasta selflearningv2", infos[1])
+        self.assertEqual(
+            self.hub.unsupported_kinds, ["hasta selflearningv2", "oregon 0x5D60"]
+        )
 
     async def test_turn_on_matches_firmware_format(self):
         await wait_for(lambda: self.device.listener is not None)
