@@ -182,6 +182,33 @@ class HubTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn(b"6:methodi2ss", off)
 
+    async def test_dim_sends_absolute_dim_frame(self):
+        await wait_for(lambda: self.device.listener is not None)
+        self.hub.dim(53103098, 2, 128)
+        self.hub.dim(53103098, 2, 0)
+        await wait_for(lambda: sum(c.startswith(b"4:send") for c, _ in self.device.commands) == 2)
+        dim, off = [c for c, _ in self.device.commands if c.startswith(b"4:send")]
+        # Raw pulse string under "S": the firmware has no native dim command
+        self.assertTrue(dim.startswith(b"4:sendh1:S"), dim)
+        length_hex, rest = dim[len(b"4:sendh1:S"):].split(b":", 1)
+        pulses = rest[: int(length_hex, 16)]
+        short, long_ = bytes([24]), bytes([127])
+        one, zero = short + long_ + short + short, short + short + short + long_
+        bits = lambda value, n: b"".join(one if value & (1 << i) else zero for i in range(n - 1, -1, -1))
+        self.assertEqual(
+            pulses,
+            short + bytes([255])
+            + bits(53103098, 26)  # house
+            + zero  # group
+            + short * 4  # the "dim" symbol in place of on/off
+            + bits(1, 4)  # unit 2, 0-based
+            + bits(128 // 16, 4)  # level, 16 steps
+            + short,
+        )
+        # Level 0 is a plain off, in the firmware's native format
+        self.assertTrue(off.startswith(b"4:sendh8:protocol7:arctech5:modelC:selflearning"), off)
+        self.assertIn(b"6:methodi2ss", off)
+
     async def test_goes_offline_and_recovers(self):
         await wait_for(lambda: self.hub.available)
         self.device.stop()

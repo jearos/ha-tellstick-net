@@ -6,6 +6,10 @@ CONF_MAC = "mac"
 CONF_SWITCHES = "switches"
 CONF_HOUSE = "house"
 CONF_UNIT = "unit"
+# Kind of self-learning receiver; entries without it are switches
+CONF_TYPE = "type"
+TYPE_SWITCH = "switch"
+TYPE_DIMMER = "dimmer"
 CONF_NEW_SENSORS_ENABLED = "new_sensors_enabled"
 
 DEFAULT_NEW_SENSORS_ENABLED = True
@@ -32,3 +36,12 @@ STORAGE_KEY = f"{DOMAIN}.sensors.{{entry_id}}"
 LATEST_FIRMWARE = 17
 FIRMWARE_UPDATE_URL = "https://developer.telldus.com/wiki/Firmware_linux"
 ISSUE_OLD_FIRMWARE = "old_firmware_{entry_id}"
+
+
+def selflearning_unique_id(mac: str, house: int, unit: int) -> str:
+    """Unique id (and device identifier) of a configured switch or dimmer."""
+    return f"{selflearning_prefix(mac)}{house}-{unit}"
+
+
+def selflearning_prefix(mac: str) -> str:
+    return f"{mac}-arctech-selflearning-"

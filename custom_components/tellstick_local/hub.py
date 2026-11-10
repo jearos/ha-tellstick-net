@@ -180,6 +180,26 @@ class TellStickHub:
     def turn_off(self, house: int, unit: int) -> None:
         self._send_arctech(house, unit, tn_const.TURNOFF)
 
+    def dim(self, house: int, unit: int, level: int) -> None:
+        """Set a self-learning dimmer to an absolute level, 0-255.
+
+        The radio format has 16 steps (level // 16); 0 turns it off. The
+        firmware has no native dim command, so this goes out as a raw pulse
+        string (the "S" key of "send").
+        """
+        args = encode(
+            protocol="arctech",
+            model="selflearning-dimmer",
+            house=house,
+            unit=unit,
+            method=tn_const.DIM,
+            param=max(0, min(255, int(level))),
+        )
+        if isinstance(args, bytes):
+            self._send_command("send", S=args)
+        else:  # level 0 is encoded as a native off command
+            self._send_command("send", **args)
+
     def _send_arctech(self, house: int, unit: int, method: int) -> None:
         # encode() takes a 1-based unit and returns the arguments for the
         # firmware's native arctech/selflearning on/off command.

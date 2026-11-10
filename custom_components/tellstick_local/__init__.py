@@ -10,6 +10,7 @@ from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
@@ -18,6 +19,7 @@ from .const import (
     CONF_HOUSE,
     CONF_MAC,
     CONF_SWITCHES,
+    CONF_TYPE,
     CONF_UNIT,
     DOMAIN,
     EVENT_RF_COMMAND,
@@ -28,11 +30,15 @@ from .const import (
     SIGNAL_PACKET,
     STORAGE_KEY,
     STORAGE_VERSION,
+    TYPE_DIMMER,
+    TYPE_SWITCH,
+    selflearning_prefix,
+    selflearning_unique_id,
 )
 from .hub import TellStickHub
 from .known_sensors import KnownSensors
 
-PLATFORMS = [Platform.SENSOR, Platform.SWITCH]
+PLATFORMS = [Platform.LIGHT, Platform.SENSOR, Platform.SWITCH]
 
 # last_seen alone changes on every reception; don't hit the disk for that
 _LAST_SEEN_SAVE_DELAY = 900
@@ -180,9 +186,43 @@ async def async_setup_entry(hass: HomeAssistant, entry: TellStickConfigEntry) ->
     )
     entry.async_on_unload(hub.async_stop)
 
+    _async_remove_stale_receivers(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
+
+
+@callback
+def _async_remove_stale_receivers(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Drop entities and devices of switches/dimmers no longer configured.
+
+    Also drops an entity left in the wrong platform, so a receiver whose
+    type changed is recreated as the right kind.
+    """
+    mac = entry.data[CONF_MAC]
+    prefix = selflearning_prefix(mac)
+    domain_of = {TYPE_SWITCH: "switch", TYPE_DIMMER: "light"}
+    wanted = {
+        selflearning_unique_id(mac, cfg[CONF_HOUSE], cfg[CONF_UNIT]): domain_of.get(
+            cfg.get(CONF_TYPE, TYPE_SWITCH), "switch"
+        )
+        for cfg in entry.options.get(CONF_SWITCHES, [])
+    }
+    entities = er.async_get(hass)
+    for reg_entry in er.async_entries_for_config_entry(entities, entry.entry_id):
+        if (
+            reg_entry.domain in ("switch", "light")
+            and reg_entry.unique_id.startswith(prefix)
+            and wanted.get(reg_entry.unique_id) != reg_entry.domain
+        ):
+            entities.async_remove(reg_entry.entity_id)
+    devices = dr.async_get(hass)
+    for device in dr.async_entries_for_config_entry(devices, entry.entry_id):
+        if any(
+            domain == DOMAIN and ident.startswith(prefix) and ident not in wanted
+            for domain, ident in device.identifiers
+        ):
+            devices.async_remove_device(device.id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: TellStickConfigEntry) -> bool:
@@ -236,11 +276,11 @@ def async_check_firmware(
 async def async_remove_config_entry_device(
     hass: HomeAssistant, entry: TellStickConfigEntry, device: dr.DeviceEntry
 ) -> bool:
-    """Allow deleting sensor and switch devices from the UI.
+    """Allow deleting sensor, switch and dimmer devices from the UI.
 
     A deleted sensor comes back if it is heard again; turn off "Enable newly
-    heard sensors" to have it come back disabled instead. A deleted switch is
-    dropped from the options so it doesn't come back on reload.
+    heard sensors" to have it come back disabled instead. A deleted switch or
+    dimmer is dropped from the options so it doesn't come back on reload.
     """
     mac = entry.data[CONF_MAC]
     if (DOMAIN, mac) in device.identifiers:
@@ -249,7 +289,7 @@ async def async_remove_config_entry_device(
     kept = [
         s
         for s in switches
-        if (DOMAIN, f"{mac}-arctech-selflearning-{s[CONF_HOUSE]}-{s[CONF_UNIT]}")
+        if (DOMAIN, selflearning_unique_id(mac, s[CONF_HOUSE], s[CONF_UNIT]))
         not in device.identifiers
     ]
     if len(kept) != len(switches):

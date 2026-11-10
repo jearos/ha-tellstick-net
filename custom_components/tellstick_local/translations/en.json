@@ -34,26 +34,31 @@
       "init": {
         "title": "TellStick Net",
         "menu_options": {
-          "add_switch": "Add Nexa self-learning switch",
-          "learn_switch": "Add switch by pressing a remote",
-          "remove_switch": "Remove switches",
+          "add_switch": "Add Nexa self-learning switch or dimmer",
+          "learn_switch": "Add switch or dimmer by pressing a remote",
+          "remove_switch": "Remove switches and dimmers",
           "replace_sensor": "Replace sensor (new ID after battery change)",
           "settings": "Settings"
         }
       },
       "add_switch": {
-        "title": "Add Nexa self-learning switch",
-        "description": "To pair a new receiver: keep the random house code, save, put the receiver in learn mode and turn the new switch on. To control a receiver that already listens to a remote, enter that remote's house code and unit (press the remote and look for a tellstick_local_command event).",
+        "title": "Add Nexa self-learning switch or dimmer",
+        "description": "To pair a new receiver: keep the random house code, save, put the receiver in learn mode and turn the new switch or dimmer on. To control a receiver that already listens to a remote, enter that remote's house code and unit (press the remote and look for a tellstick_local_command event), or use \"Add switch or dimmer by pressing a remote\".",
         "data": {
           "name": "Name",
+          "type": "Type",
           "house": "House code",
           "unit": "Unit (1-16)"
+        },
+        "data_description": {
+          "name": "Leave empty to name it after its house code and unit.",
+          "type": "Dimmer: for self-learning dimmer receivers. Brightness is sent in 16 steps."
         }
       },
       "remove_switch": {
-        "title": "Remove switches",
+        "title": "Remove switches and dimmers",
         "data": {
-          "switches": "Switches to remove"
+          "switches": "Switches and dimmers to remove"
         }
       },
       "settings": {
@@ -87,24 +92,39 @@
       },
       "learn_confirm": {
         "title": "Remote found",
-        "description": "Heard house code {house}, unit {unit}. The new switch sends exactly this code, so receivers that obey this button will also obey Home Assistant - no pairing needed. Pressing the button later also updates the switch's state in Home Assistant.",
+        "description": "Heard house code {house}, unit {unit}. The new switch or dimmer sends exactly this code, so receivers that obey this button will also obey Home Assistant - no pairing needed. Pressing the button later also updates its on/off state in Home Assistant.",
         "data": {
-          "name": "Name"
+          "name": "Name",
+          "type": "Type"
+        },
+        "data_description": {
+          "type": "Choose dimmer if the receiver this button controls is a dimmer."
         }
       }
     },
     "error": {
-      "already_exists": "A switch with this house code and unit already exists.",
+      "already_exists": "A switch or dimmer with this house code and unit already exists.",
       "same_sensor": "Pick two different sensors."
     },
     "progress": {
       "press_remote": "Press an on or off button on the remote or wall switch you want to copy. Listening for {seconds} seconds..."
+    },
+    "abort": {
+      "already_exists": "A switch or dimmer with house code {house}, unit {unit} already exists."
     }
   },
   "issues": {
     "old_firmware": {
       "title": "{name} needs firmware {latest}",
       "description": "{name} reports firmware {firmware}. The local interface this integration uses was added in TellStick Net firmware {latest}; older versions don't have it, so sensors and switches won't work until the device is updated.\n\nTelldus' firmware is installed over TFTP: download `tellstick_net_fw{latest}.hex` from Telldus and follow their guide (Learn more), or see \"Updating the firmware\" in this integration's README. If an update is interrupted the device goes into recovery mode (LED blinks in groups of seven) and the upload can simply be repeated.\n\nThis notice disappears once the device reports firmware {latest} or newer."
+    }
+  },
+  "selector": {
+    "receiver_type": {
+      "options": {
+        "switch": "On/off switch",
+        "dimmer": "Dimmer"
+      }
     }
   }
 }

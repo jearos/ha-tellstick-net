@@ -29,6 +29,8 @@ goes through Telldus Live.
 - **Switches**: Nexa / Proove / Arctech *self-learning* on/off receivers, either
   paired with a new code or copied from an existing remote by pressing one of
   its buttons.
+- **Dimmers** (untested): self-learning dimmer receivers as lights with
+  brightness (16 steps), added the same way as switches.
 - **Remote events**: every decoded remote/wall-switch press fires a
   `tellstick_local_command` event for automations.
 - **Follows the device** if it gets a new IP address (DHCP discovery, plus
@@ -43,6 +45,7 @@ goes through Telldus Live.
 | Device | TellStick Net, stock firmware 17 |
 | Sensors | Oregon Scientific temperature/humidity |
 | Switches | Nexa self-learning receivers and remotes |
+| Dimmers | not yet - reports welcome |
 | Home Assistant | 2026.10 |
 
 Decoders for Fine Offset, Mandolyn and other sensors are included but
@@ -90,9 +93,9 @@ Then use **Configure** on the integration for:
 
 | Option | What it does |
 |---|---|
-| Add Nexa self-learning switch | Creates a switch with a new random code. Save, put the receiver in learn mode (often: just plug it in) and turn the switch on in Home Assistant to pair. |
-| Add switch by pressing a remote | Listens for 60 seconds; press an on/off button on a Nexa/Proove self-learning remote or wall switch. A switch with that button's code is created, so receivers that already obey the button obey Home Assistant too, without pairing. |
-| Remove switches | Removes switches. |
+| Add Nexa self-learning switch or dimmer | Creates a switch or dimmer with a new random code. Save, put the receiver in learn mode (often: just plug it in) and turn it on in Home Assistant to pair. |
+| Add switch or dimmer by pressing a remote | Listens for 60 seconds; press an on/off button on a Nexa/Proove self-learning remote or wall switch. A switch or dimmer with that button's code is created, so receivers that already obey the button obey Home Assistant too, without pairing. |
+| Remove switches and dimmers | Removes them, including their devices. |
 | Replace sensor | After a battery change: pick the old sensor and the new one. The old one keeps its history and follows the new ID; the duplicate is removed. |
 | Settings | Whether newly heard sensors are enabled automatically. Turn off if you pick up your neighbours' sensors. |
 
@@ -100,6 +103,12 @@ Switch state is assumed (433 MHz is one-way). It also follows presses of the
 same code over the air: for a switch copied from a remote, pressing that
 remote updates Home Assistant. A switch paired with its own new code doesn't
 see the remote's presses, because the remote sends a different code.
+
+Dimmers take a brightness from Home Assistant and send it as an absolute
+level (16 steps); "on" without a brightness lets the receiver return to its
+own last level. Remotes and wall switches dim *relatively* (press on again to
+start and stop the receiver's dim cycle) and only send on/off, so a dimmer's
+brightness in Home Assistant follows Home Assistant, not the remote.
 
 Unwanted sensors can be deleted from their device page. If they keep
 transmitting they come back (disabled, if *Settings* says so).
@@ -211,8 +220,10 @@ missed command would be dangerous.
 
 ## Limitations
 
-- Switches: only Arctech self-learning on/off for now (no dimmers, no
-  code-wheel/old Nexa, no other protocols).
+- Switches and dimmers: only Arctech self-learning for now (no
+  code-wheel/old Nexa, no other protocols). Dimmers are untested.
+- Absolute dim commands sent by other controllers (e.g. a Nexa Bridge) are
+  not reported by the TellStick, so their brightness can't be followed.
 - Sensors: temperature and humidity only (no rain/wind yet).
 - The device supports one listener at a time. Running this next to another
   local client (e.g. the tellsticknet MQTT bridge) makes them steal events

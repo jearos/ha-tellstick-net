@@ -34,12 +34,15 @@ from .const import (
     CONF_MAC,
     CONF_NEW_SENSORS_ENABLED,
     CONF_SWITCHES,
+    CONF_TYPE,
     CONF_UNIT,
     DEFAULT_NEW_SENSORS_ENABLED,
     DOMAIN,
     HOUSE_MAX,
     HOUSE_MIN,
     SIGNAL_PACKET,
+    TYPE_DIMMER,
+    TYPE_SWITCH,
     UNIT_MAX,
     UNIT_MIN,
 )
@@ -51,6 +54,24 @@ MANUAL = "manual"
 LEARN_TIMEOUT = 60
 OLD_SENSOR = "old_sensor"
 NEW_SENSOR = "new_sensor"
+
+
+def _type_selector() -> selector.SelectSelector:
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=[TYPE_SWITCH, TYPE_DIMMER],
+            translation_key="receiver_type",
+            mode=selector.SelectSelectorMode.LIST,
+        )
+    )
+
+
+def _receiver(name: str, house: int, unit: int, kind: str) -> dict[str, Any]:
+    """A switches-list item; the type key is only stored for dimmers."""
+    item: dict[str, Any] = {CONF_NAME: name, CONF_HOUSE: house, CONF_UNIT: unit}
+    if kind == TYPE_DIMMER:
+        item[CONF_TYPE] = TYPE_DIMMER
+    return item
 
 
 def _ago(timestamp: float | None) -> str:
@@ -243,9 +264,9 @@ class TellStickOptionsFlow(OptionsFlow):
             if any(s[CONF_HOUSE] == house and s[CONF_UNIT] == unit for s in switches):
                 errors["base"] = "already_exists"
             else:
-                switches.append(
-                    {CONF_NAME: user_input[CONF_NAME].strip(), CONF_HOUSE: house, CONF_UNIT: unit}
-                )
+                kind = user_input.get(CONF_TYPE, TYPE_SWITCH)
+                name = user_input.get(CONF_NAME, "").strip() or f"Nexa {house} unit {unit}"
+                switches.append(_receiver(name, house, unit, kind))
                 return self.async_create_entry(
                     data={**self._options(), CONF_SWITCHES: switches}
                 )
@@ -255,6 +276,7 @@ class TellStickOptionsFlow(OptionsFlow):
         # tellstick_local_command event and type it in instead.
         defaults = user_input or {
             CONF_NAME: "",
+            CONF_TYPE: TYPE_SWITCH,
             CONF_HOUSE: random.randint(HOUSE_MIN, HOUSE_MAX),
             CONF_UNIT: UNIT_MIN,
         }
@@ -262,7 +284,8 @@ class TellStickOptionsFlow(OptionsFlow):
             step_id="add_switch",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_NAME, default=defaults[CONF_NAME]): str,
+                    vol.Optional(CONF_NAME, default=defaults[CONF_NAME]): str,
+                    vol.Required(CONF_TYPE, default=defaults[CONF_TYPE]): _type_selector(),
                     vol.Required(CONF_HOUSE, default=defaults[CONF_HOUSE]): selector.NumberSelector(
                         selector.NumberSelectorConfig(
                             min=HOUSE_MIN, max=HOUSE_MAX, step=1,
@@ -342,10 +365,15 @@ class TellStickOptionsFlow(OptionsFlow):
         house, unit = self._learned["house"], self._learned["unit"]
         switches = self._switches()
         exists = any(s[CONF_HOUSE] == house and s[CONF_UNIT] == unit for s in switches)
-        errors: dict[str, str] = {"base": "already_exists"} if exists else {}
-        if user_input is not None and not exists:
+        if exists:
+            return self.async_abort(
+                reason="already_exists",
+                description_placeholders={"house": str(house), "unit": str(unit)},
+            )
+        if user_input is not None:
+            name = user_input.get(CONF_NAME, "").strip() or f"Nexa {house} unit {unit}"
             switches.append(
-                {CONF_NAME: user_input[CONF_NAME].strip(), CONF_HOUSE: house, CONF_UNIT: unit}
+                _receiver(name, house, unit, user_input.get(CONF_TYPE, TYPE_SWITCH))
             )
             return self.async_create_entry(
                 data={**self._options(), CONF_SWITCHES: switches}
@@ -353,10 +381,12 @@ class TellStickOptionsFlow(OptionsFlow):
         return self.async_show_form(
             step_id="learn_confirm",
             data_schema=vol.Schema(
-                {vol.Required(CONF_NAME, default=f"Nexa {house} unit {unit}"): str}
+                {
+                    vol.Required(CONF_NAME, default=f"Nexa {house} unit {unit}"): str,
+                    vol.Required(CONF_TYPE, default=TYPE_SWITCH): _type_selector(),
+                }
             ),
             description_placeholders={"house": str(house), "unit": str(unit)},
-            errors=errors,
         )
 
     async def async_step_remove_switch(
@@ -371,7 +401,7 @@ class TellStickOptionsFlow(OptionsFlow):
         options = [
             selector.SelectOptionDict(
                 value=f"{s[CONF_HOUSE]}-{s[CONF_UNIT]}",
-                label=f"{s[CONF_NAME]} (house {s[CONF_HOUSE]}, unit {s[CONF_UNIT]})",
+                label=f"{s[CONF_NAME]} ({s.get(CONF_TYPE, TYPE_SWITCH)}, house {s[CONF_HOUSE]}, unit {s[CONF_UNIT]})",
             )
             for s in switches
         ]
