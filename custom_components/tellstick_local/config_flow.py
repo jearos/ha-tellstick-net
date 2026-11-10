@@ -50,15 +50,12 @@ from .const import (
     UNIT_MIN,
 )
 from .hub import DiscoveredDevice, async_discover
-from .rf_filter import REPEAT, CommandFilter
+from .rf_filter import LEARN_FRAMES, LEARN_WINDOW, NEW, CommandFilter
 from .known_sensors import KnownSensor
 
 MANUAL = "manual"
 # How long "Add switch by pressing a remote" listens for a button press
 LEARN_TIMEOUT = 60
-# A code is learned only when heard twice this close together: a slipped-bit
-# frame (no checksum) almost never repeats identically, a real press does
-LEARN_CONFIRM_WINDOW = 5.0
 OLD_SENSOR = "old_sensor"
 NEW_SENSOR = "new_sensor"
 
@@ -336,7 +333,10 @@ class TellStickOptionsFlow(OptionsFlow):
 
     async def _async_wait_for_remote(self) -> dict[str, Any]:
         found: asyncio.Future[dict[str, Any]] = self.hass.loop.create_future()
-        confirm = CommandFilter(repeat_window=LEARN_CONFIRM_WINDOW)
+        # A press often decodes with slipped bits; take the code that recurs
+        confirm = CommandFilter(
+            repeat_window=LEARN_WINDOW, frames_needed=LEARN_FRAMES
+        )
 
         @callback
         def on_packet(packet: dict[str, Any]) -> None:
@@ -348,7 +348,7 @@ class TellStickOptionsFlow(OptionsFlow):
                 and packet.get("group") != 1  # "all on/off" names no unit
                 and isinstance(packet.get("house"), int)
                 and isinstance(packet.get("unit"), int)
-                and confirm.classify(packet) == REPEAT
+                and confirm.classify(packet) == NEW
             ):
                 found.set_result(packet)
 

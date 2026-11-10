@@ -200,20 +200,21 @@ class HubTests(unittest.IsolatedAsyncioTestCase):
             self.hub.unsupported_kinds, ["hasta selflearningv2", "oregon 0x5D60"]
         )
 
-    async def test_repeated_press_is_flagged(self):
+    async def test_rest_of_press_flagged_as_repeat(self):
         await wait_for(lambda: self.device.listener is not None)
-        self.device.emit(NEXA_ON)
-        self.device.emit(NEXA_ON)
-        await wait_for(lambda: len(self.packets) == 2)
-        self.assertEqual([p["repeat"] for p in self.packets], [False, True])
+        for _ in range(3):
+            self.device.emit(NEXA_ON)
+        await wait_for(lambda: len(self.packets) == 3)
+        self.assertEqual([p["repeat"] for p in self.packets], [False, True, True])
 
     async def test_phantom_everflourish_dropped(self):
         await wait_for(lambda: self.device.listener is not None)
-        for packet in (NEXA_ON, EVERFLOURISH, MANDOLYN):
+        # As captured: each Nexa frame followed by its Everflourish twin
+        for packet in (NEXA_ON, EVERFLOURISH, NEXA_ON, EVERFLOURISH, MANDOLYN):
             self.device.emit(packet)
-        await wait_for(lambda: len(self.packets) == 2)
+        await wait_for(lambda: len(self.packets) == 3)
         self.assertEqual(
-            [p["protocol"] for p in self.packets], ["arctech", "mandolyn"]
+            [p["protocol"] for p in self.packets], ["arctech", "arctech", "mandolyn"]
         )
 
     async def test_discover_resolves_hostname(self):

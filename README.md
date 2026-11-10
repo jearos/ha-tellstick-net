@@ -38,8 +38,8 @@ goes through Telldus Live.
   (on/off presses), for the automation editor.
 - **Remote events**: every decoded remote/wall-switch press fires a
   `tellstick_local_command` event for automations, once per press (the
-  radio repeats are filtered, as are phantom Everflourish presses the
-  firmware decodes from Nexa signals).
+  radio repeats are filtered). Phantom Everflourish presses the firmware
+  decodes from Nexa signals are dropped.
 - **Follows the device** if it gets a new IP address (DHCP discovery, plus
   rediscovery by MAC while it's offline).
 - **Firmware check**: a repair issue if the device runs firmware without the
@@ -239,6 +239,12 @@ missed command would be dangerous.
 
 - Switches and dimmers: only Arctech self-learning for now (no
   code-wheel/old Nexa, no other protocols). Dimmers are untested.
+- Nexa frames have no checksum, and the TellStick often decodes a press's
+  repeats with slipped bits. Those show up as extra
+  `tellstick_local_command` events with odd house codes and units, so
+  automations should match on `house` and `unit`. They never match a
+  configured device, and *Add device by pressing* only takes a code heard
+  three times within 10 s.
 - One device per house code and unit: a remote button copied as a switch
   can't also be added as a button entity (its presses still fire
   `tellstick_local_command` events, and the switch follows them).

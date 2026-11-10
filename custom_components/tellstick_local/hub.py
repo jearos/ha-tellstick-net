@@ -361,6 +361,11 @@ class TellStickHub:
         self._seen()
         _LOGGER.debug("<- %s %s", self.host, data)
         try:
+            _, args = _decode_command(data)
+            self._filter.saw_frame(args.get("protocol"))
+        except Exception:  # noqa: BLE001 - garbage; decode_packet logs it
+            pass
+        try:
             packet = decode_packet(data)
         except NotImplementedError:
             self._log_unsupported(data)
@@ -374,6 +379,6 @@ class TellStickHub:
         if kind == DROP:
             _LOGGER.debug("Dropped phantom %s", packet)
             return
-        # Repeats still update state; events and learning skip or use them
+        # The rest of a burst still updates state; events skip it
         packet["repeat"] = kind == REPEAT
         self._on_packet(packet)

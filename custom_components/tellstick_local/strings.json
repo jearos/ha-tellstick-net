@@ -107,7 +107,7 @@
       "same_sensor": "Pick two different sensors."
     },
     "progress": {
-      "press_remote": "Press an on or off button on the remote or wall switch, open the door contact or trigger the motion sensor. A code is taken once it's heard twice; if nothing happens, press again. Listening for {seconds} seconds..."
+      "press_remote": "Press an on or off button on the remote or wall switch a few times (or hold it), open and close the door contact, or trigger the motion sensor. Listening for {seconds} seconds..."
     },
     "abort": {
       "already_exists": "A device with house code {house}, unit {unit} already exists."
