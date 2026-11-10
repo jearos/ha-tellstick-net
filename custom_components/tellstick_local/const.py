@@ -17,6 +17,8 @@ TYPE_BUTTON = "button"
 # Motion sensors that only send "on" are turned off after this many seconds
 MOTION_OFF_AFTER = 60
 CONF_NEW_SENSORS_ENABLED = "new_sensors_enabled"
+# Sensor quantity shown as a battery binary sensor, not a sensor
+QUANTITY_BATTERY_LOW = "battery_low"
 
 DEFAULT_NEW_SENSORS_ENABLED = True
 

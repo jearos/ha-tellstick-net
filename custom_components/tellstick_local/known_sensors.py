@@ -24,6 +24,13 @@ from typing import Any
 type RadioKey = tuple[str, str, int]  # (protocol, model, sensor id)
 
 
+def radio_key(packet: dict[str, Any]) -> RadioKey | None:
+    """Key of a decoded sensor packet, None for anything else."""
+    if packet.get("class") != "sensor" or "sensorId" not in packet:
+        return None
+    return (str(packet["protocol"]), str(packet.get("model", "")), int(packet["sensorId"]))
+
+
 @dataclass
 class KnownSensor:
     uid: str

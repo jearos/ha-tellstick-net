@@ -26,18 +26,18 @@ from homeassistant.const import (
     UnitOfVolumetricFlux,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import TellStickConfigEntry, sensor_device_identifier, sensor_unique_id
+from . import TellStickConfigEntry, sensor_unique_id
 from .const import (
     CONF_NEW_SENSORS_ENABLED,
     DEFAULT_NEW_SENSORS_ENABLED,
+    QUANTITY_BATTERY_LOW,
     SIGNAL_PACKET,
 )
-from .entity import TellStickEntity
-from .known_sensors import KnownSensor, RadioKey
+from .entity import TellStickEntity, sensor_device_info
+from .known_sensors import KnownSensor, radio_key
 
 DESCRIPTIONS: dict[str, SensorEntityDescription] = {
     "temp": SensorEntityDescription(
@@ -92,12 +92,6 @@ DESCRIPTIONS: dict[str, SensorEntityDescription] = {
 }
 
 
-def _radio_key(packet: dict[str, Any]) -> RadioKey | None:
-    if packet.get("class") != "sensor" or "sensorId" not in packet:
-        return None
-    return (str(packet["protocol"]), str(packet.get("model", "")), int(packet["sensorId"]))
-
-
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: TellStickConfigEntry,
@@ -134,7 +128,7 @@ async def async_setup_entry(
 
     @callback
     def handle_packet(packet: dict[str, Any]) -> None:
-        key = _radio_key(packet)
+        key = radio_key(packet)
         if key is None:
             return
         values = {
@@ -144,7 +138,13 @@ async def async_setup_entry(
         }
         if not values:
             return
-        sensor, _ = known.heard(key, values)
+        # The battery flag is a quantity too; binary_sensor.py shows it
+        battery = any(
+            item.get("name") == QUANTITY_BATTERY_LOW for item in packet["data"]
+        )
+        sensor, _ = known.heard(
+            key, [*values, QUANTITY_BATTERY_LOW] if battery else values
+        )
         added: list[TellStickSensor] = []
         for quantity, value in values.items():
             entity = entities.get((sensor.uid, quantity))
@@ -177,14 +177,7 @@ class TellStickSensor(TellStickEntity, RestoreSensor):
         self.entity_description = description
         self._attr_entity_registry_enabled_default = enabled_default
         self._attr_unique_id = sensor_unique_id(self._mac, sensor.uid, description.key)
-        # Name/model are only used when the device is first created; after a
-        # replace the registry keeps the original (or user-given) name.
-        self._attr_device_info = DeviceInfo(
-            identifiers={sensor_device_identifier(self._mac, sensor.uid)},
-            name=f"{sensor.protocol.capitalize()} sensor {sensor.sensor_id}",
-            model=f"{sensor.protocol} {sensor.model}".strip(),
-            **self._via_device,
-        )
+        self._attr_device_info = sensor_device_info(self._mac, sensor, self._via_device)
         self._pending: Any = None
 
     @property

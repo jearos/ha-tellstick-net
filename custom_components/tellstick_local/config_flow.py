@@ -36,6 +36,7 @@ from .const import (
     CONF_SWITCHES,
     CONF_TYPE,
     CONF_UNIT,
+    QUANTITY_BATTERY_LOW,
     DEFAULT_NEW_SENSORS_ENABLED,
     DOMAIN,
     HOUSE_MAX,
@@ -478,8 +479,9 @@ class TellStickOptionsFlow(OptionsFlow):
         # kept sensor's entities (and their history) take over from here.
         entity_registry = er.async_get(self.hass)
         for quantity in dropped.quantities if dropped else []:
+            domain = "binary_sensor" if quantity == QUANTITY_BATTERY_LOW else "sensor"
             if entity_id := entity_registry.async_get_entity_id(
-                "sensor", DOMAIN, sensor_unique_id(mac, new_uid, quantity)
+                domain, DOMAIN, sensor_unique_id(mac, new_uid, quantity)
             ):
                 entity_registry.async_remove(entity_id)
         device_registry = dr.async_get(self.hass)

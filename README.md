@@ -23,6 +23,9 @@ goes through Telldus Live.
   automatically via DHCP.
 - **Sensors**: 433 MHz temperature/humidity, wind and rain sensors are
   created automatically the first time they're heard. Push-based, no polling.
+- **Battery low**: Oregon sensors get a *Battery* diagnostic entity from the
+  battery flag in their readings (bit position as rtl_433 reads it; not yet
+  seen "low" on real hardware). The first low report is also logged.
 - **Keeps history across battery changes**: many cheap sensors pick a new
   random ID when the battery is changed. *Replace sensor* moves the new ID onto
   the old sensor, keeping its entities, name, area and history.

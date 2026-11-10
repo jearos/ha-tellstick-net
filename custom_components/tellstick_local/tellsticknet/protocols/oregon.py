@@ -3,6 +3,8 @@
 # Net only frames the message; the fields are decoded here. Unlike Telldus the
 # sensor ID is the whole rolling-code byte (Telldus adds its two nibbles).
 # Only the field layouts are taken from there; the code is our own.
+# battery_low is bit 0x4 of the flags nibble sent right after the rolling
+# code, as rtl_433 reads it ((msg[3] >> 2) & 1) for all these models.
 
 
 def _nibbles(data, count):
@@ -34,15 +36,19 @@ def _rolling(low, high):
     return (high << 4) | low
 
 
+def _battery_low(flags):
+    return bool(flags & 0x4)
+
+
 def decode_temp(packet):
     """0xEA4C THN132N and similar: temperature.
 
     >>> decode(dict(model=0xEA4C, data=0x103A40213003))["data"]
-    {'temp': 21.4}
+    {'temp': 21.4, 'battery_low': False}
     """
     n = _nibbles(packet["data"], 12)
-    # 0 checksum high, 1 ?, 2 flags (bit 3 sign, bits 0-1 hundreds),
-    # 3 checksum low, 4-5 temp tens/units, 6 ?, 7 temp tenths,
+    # 0 checksum high, 1 ?, 2 sign (bit 3) and hundreds (bits 0-1),
+    # 3 checksum low, 4-5 temp tens/units, 6 flags, 7 temp tenths,
     # 8-9 rolling code, 10-11 channel
     checksum = (_id_sum(packet["model"]) + n[2] + sum(n[4:12]) - 0xA) & 0xFF
     if checksum != (n[0] << 4) | n[3]:
@@ -51,7 +57,10 @@ def decode_temp(packet):
     return dict(
         packet,
         sensorId=_rolling(n[8], n[9]),
-        data=dict(temp=-temperature if n[2] & 0x8 else temperature),
+        data=dict(
+            temp=-temperature if n[2] & 0x8 else temperature,
+            battery_low=_battery_low(n[6]),
+        ),
     )
 
 
@@ -62,16 +71,16 @@ def decode_temp_humidity_v3(packet):
 
     >>> p = decode(dict(model=0xF824, data=0x13B05220640F37))
     >>> p["data"], p["sensorId"]
-    ({'temp': 22.5, 'humidity': 46.0}, 59)
-    >>> decode(dict(model=0x1D20, data=0x13B01408640637))["data"]
-    {'temp': -4.1, 'humidity': 46.0}
+    ({'temp': 22.5, 'humidity': 46.0, 'battery_low': False}, 59)
+    >>> decode(dict(model=0x1D20, data=0x13B01408640637))["data"]["temp"]
+    -4.1
     >>> decode(dict(model=0xF824, data=0x13B05220640F47))
     Traceback (most recent call last):
     ...
     ValueError: Oregon checksum mismatch
     """
     n = _nibbles(packet["data"], 14)
-    # 0 CRC, 1-2 checksum, 3 ?, 4-5 humidity, 6 sign, 7-9 temp, 10 battery,
+    # 0 CRC, 1-2 checksum, 3 ?, 4-5 humidity, 6 sign, 7-9 temp, 10 flags,
     # 11-12 rolling code, 13 channel
     _check(n[1:], n[3:14], packet["model"])
     temperature = _bcd(n[7], n[8], n[9]) / 10.0
@@ -81,6 +90,7 @@ def decode_temp_humidity_v3(packet):
         data=dict(
             temp=-temperature if n[6] else temperature,
             humidity=float(_bcd(n[4], n[5])),
+            battery_low=_battery_low(n[10]),
         ),
     )
 
@@ -89,16 +99,19 @@ def decode_temp_v3(packet):
     """0xC844 THWR800 pool thermometer, 0xEC40 THN132N v3: temperature.
 
     >>> decode(dict(model=0xEC40, data=0x2A50271093))["data"]
-    {'temp': 17.2}
+    {'temp': 17.2, 'battery_low': False}
     """
     n = _nibbles(packet["data"], 10)
-    # 0-1 checksum, 2 sign, 3-5 temp, 6 battery, 7-8 rolling code, 9 channel
+    # 0-1 checksum, 2 sign, 3-5 temp, 6 flags, 7-8 rolling code, 9 channel
     _check(n, n[2:10], packet["model"])
     temperature = _bcd(n[3], n[4], n[5]) / 10.0
     return dict(
         packet,
         sensorId=_rolling(n[7], n[8]),
-        data=dict(temp=-temperature if n[2] else temperature),
+        data=dict(
+            temp=-temperature if n[2] else temperature,
+            battery_low=_battery_low(n[6]),
+        ),
     )
 
 
@@ -106,11 +119,11 @@ def decode_wind(packet):
     """0x1984 / 0x1994 WGR800: wind average and gust (m/s), direction.
 
     >>> decode(dict(model=0x1984, data=0x17C0400230020533))["data"]
-    {'winddirection': 90.0, 'windaverage': 2.0, 'windgust': 3.2}
+    {'winddirection': 90.0, 'windaverage': 2.0, 'windgust': 3.2, 'battery_low': False}
     """
     n = _nibbles(packet["data"], 16)
     # 0 CRC, 1-2 checksum, 3-5 average, 6-8 gust, 9-10 ?, 11 direction,
-    # 12 battery, 13-14 rolling code, 15 channel
+    # 12 flags, 13-14 rolling code, 15 channel
     _check(n[1:], n[3:16], packet["model"])
     return dict(
         packet,
@@ -119,6 +132,7 @@ def decode_wind(packet):
             winddirection=22.5 * n[11],
             windaverage=_bcd(n[3], n[4], n[5]) / 10.0,
             windgust=_bcd(n[6], n[7], n[8]) / 10.0,
+            battery_low=_battery_low(n[12]),
         ),
     )
 
@@ -127,18 +141,22 @@ def decode_rain(packet):
     """0x2914 PCR800: rain total (mm) and rate (mm/h).
 
     >>> decode(dict(model=0x2914, data=0x1E105200102100B2))["data"]
-    {'raintotal': 30.5, 'rainrate': 6.3}
+    {'raintotal': 30.5, 'rainrate': 6.3, 'battery_low': False}
     """
     n = _nibbles(packet["data"], 16)
     # 0-1 checksum, 2-7 total (1/1000 inch), 8-11 rate (1/100 inch/h),
-    # 12 battery, 13-14 rolling code, 15 channel
+    # 12 flags, 13-14 rolling code, 15 channel
     _check(n, n[2:16], packet["model"])
     total = _bcd(*n[2:8]) / 1000.0 * 25.4
     rate = _bcd(*n[8:12]) / 100.0 * 25.4
     return dict(
         packet,
         sensorId=_rolling(n[13], n[14]),
-        data=dict(raintotal=round(total, 1), rainrate=round(rate, 1)),
+        data=dict(
+            raintotal=round(total, 1),
+            rainrate=round(rate, 1),
+            battery_low=_battery_low(n[12]),
+        ),
     )
 
 
@@ -150,6 +168,16 @@ def decode(packet):
     24.2
     >>> decode(dict(data=0x201F242450443BDD, model=6701))["data"]["humidity"]
     45.0
+
+    Local additions (tellstick_local), captured from sensors 131 and 82, and
+    131 with the battery-low flag set (checksum adjusted):
+
+    >>> decode(dict(data=0x2083502200843284, model=6701))["data"]
+    {'temp': 22.5, 'humidity': 40.0, 'battery_low': False}
+    >>> decode(dict(data=0x1052401800052A89, model=6701))["data"]["battery_low"]
+    False
+    >>> decode(dict(data=0x2083542200843684, model=6701))["data"]
+    {'temp': 22.5, 'humidity': 40.0, 'battery_low': True}
     """
 
     decoder = DECODERS.get(packet["model"])
@@ -162,6 +190,8 @@ def decode(packet):
 
     data = packet["data"]
     value = int(data)
+    # Local change (tellstick_local): flags nibble, low half of byte 5
+    battery_low = _battery_low(value >> 40)
     value >>= 8
     checksum1 = value & 0xFF
     value >>= 8
@@ -206,7 +236,7 @@ def decode(packet):
     return dict(
         packet,
         sensorId=address,
-        data=dict(temp=temperature, humidity=humidity),
+        data=dict(temp=temperature, humidity=humidity, battery_low=battery_low),
     )
 
 

@@ -11,7 +11,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from . import TellStickConfigEntry
+from . import TellStickConfigEntry, sensor_device_identifier
 from .const import (
     CONF_HOUSE,
     CONF_MAC,
@@ -21,6 +21,20 @@ from .const import (
     SIGNAL_PACKET,
     selflearning_unique_id,
 )
+from .known_sensors import KnownSensor
+
+
+def sensor_device_info(
+    mac: str, sensor: KnownSensor, via_device: dict[str, Any]
+) -> DeviceInfo:
+    """Device of an RF sensor. Name/model only apply when it is first
+    created; after a replace the registry keeps the original or user name."""
+    return DeviceInfo(
+        identifiers={sensor_device_identifier(mac, sensor.uid)},
+        name=f"{sensor.protocol.capitalize()} sensor {sensor.sensor_id}",
+        model=f"{sensor.protocol} {sensor.model}".strip(),
+        **via_device,
+    )
 
 
 class TellStickEntity(Entity):

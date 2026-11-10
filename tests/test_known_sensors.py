@@ -115,5 +115,15 @@ class KnownSensorsTests(unittest.TestCase):
         self.assertIsNone(self.sensors.find(OLD))
 
 
+class RadioKeyTests(unittest.TestCase):
+    def test_sensor_packet(self):
+        packet = {"class": "sensor", "protocol": "oregon", "model": 6701, "sensorId": 131}
+        self.assertEqual(ks.radio_key(packet), ("oregon", "6701", 131))
+
+    def test_other_packets(self):
+        self.assertIsNone(ks.radio_key({"class": "command", "protocol": "arctech"}))
+        self.assertIsNone(ks.radio_key({"class": "sensor", "protocol": "oregon"}))
+
+
 if __name__ == "__main__":
     unittest.main()

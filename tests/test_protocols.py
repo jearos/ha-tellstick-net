@@ -45,18 +45,30 @@ class OregonPacketTests(unittest.TestCase):
         self.assertEqual(packet["class"], "sensor")
         self.assertEqual(packet["model"], 0xF824)
         self.assertEqual(packet["sensorId"], 0x3B)
-        self.assertEqual(self.values(packet), {"temp": 22.5, "humidity": 46.0})
+        self.assertEqual(
+            self.values(packet), {"temp": 22.5, "humidity": 46.0, "battery_low": False}
+        )
 
     def test_wind(self):
         packet = protocol.decode_packet(raw_oregon(0x1984, 0x17C0400230020533))
         self.assertEqual(
             self.values(packet),
-            {"winddirection": 90.0, "windaverage": 2.0, "windgust": 3.2},
+            {"winddirection": 90.0, "windaverage": 2.0, "windgust": 3.2, "battery_low": False},
         )
 
     def test_rain(self):
         packet = protocol.decode_packet(raw_oregon(0x2914, 0x1E105200102100B2))
-        self.assertEqual(self.values(packet), {"raintotal": 30.5, "rainrate": 6.3})
+        self.assertEqual(
+            self.values(packet), {"raintotal": 30.5, "rainrate": 6.3, "battery_low": False}
+        )
+
+    def test_battery_low_from_captured_frame(self):
+        # Sensor 131 as captured, with the flags nibble's 0x4 bit set
+        packet = protocol.decode_packet(
+            b"7:RawDatah5:class6:sensor8:protocol6:oregon5:modeli1A2Ds"
+            b"4:datai2083542200843684ss"
+        )
+        self.assertTrue(self.values(packet)["battery_low"])
 
     def test_bad_checksum_rejected(self):
         with self.assertRaises(ValueError):
