@@ -91,6 +91,11 @@ The TellStick ZNet Lite has an official local API and isn't supported here.
 
 ### HACS (custom repository)
 
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jearos&repository=ha-tellstick-net&category=integration)
+
+The button opens HACS on this repository in your own Home Assistant and
+offers to add it. Or by hand:
+
 1. HACS → ⋮ → *Custom repositories* → add
    `https://github.com/jearos/ha-tellstick-net`, category *Integration*.
 2. Install *TellStick Net (local)* and restart Home Assistant.
@@ -102,7 +107,9 @@ Copy `custom_components/tellstick_local/` into your Home Assistant
 
 ## Setup
 
-*Settings → Devices & services → Add integration → TellStick Net (local)*.
+[![Open your Home Assistant instance and start setting up TellStick Net (local).](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=tellstick_local)
+
+Or *Settings → Devices & services → Add integration → TellStick Net (local)*.
 Pick the device from the list, or enter its IP address. A TellStick Net that
 gets an address via DHCP may also show up as *Discovered*.
 
